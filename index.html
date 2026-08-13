@@ -130,6 +130,9 @@
 
         <span class="nav-divider nav-divider-bottom"></span>
 
+        <button id="sidebar-signin-btn" class="segment-btn" onclick="window.openSignInDialog()" style="color:#b45309;">
+          <i class="fas fa-right-to-bracket"></i> Sign In
+        </button>
         <button class="segment-btn" data-page="print-layouts" onclick="showPage('print-layouts')">
           <i class="fas fa-print"></i> Print Layouts
         </button>
@@ -189,6 +192,9 @@
           </div>
           <div class="mobile-more-item" onclick="closeMobileMoreSheet(); refreshAllData();">
             <i class="fas fa-database"></i> Refresh Data
+          </div>
+          <div id="mobile-signin-btn" class="mobile-more-item" onclick="closeMobileMoreSheet(); window.openSignInDialog();" style="color:#b45309;">
+            <i class="fas fa-right-to-bracket"></i> Sign In
           </div>
           <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('help');">
             <i class="fas fa-circle-question"></i> Help

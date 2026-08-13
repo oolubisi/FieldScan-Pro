@@ -156,7 +156,7 @@ function buildRequestEnvelope(action, data) {
  * localStorage directly when running as a plain browser/PWA deployment
  * of this same frontend. Falls back to null (unauthenticated) if
  * there's no session yet -- callers should show the sign-in form in
- * that case (see showSignInBanner() below).
+ * that case (see openSignInDialog() below).
  */
 async function getSessionToken() {
   if (window.electronAuth && typeof window.electronAuth.getToken === "function") {
@@ -200,7 +200,7 @@ async function login(email, password) {
   FIELD_SCAN_USER.role = result.role;
 
   if (typeof showSyncToast === "function") showSyncToast(`✅ Signed in as ${result.email}`);
-  hideSignInBanner();
+  setSignInMenuState(true);
   return result;
 }
 window.login = login;
@@ -208,96 +208,127 @@ window.login = login;
 /**
  * A small, non-blocking banner shown at the top of the app when there's
  * no valid session -- the app stays fully usable underneath (offline-
- * first: reads still fall back to local cache, writes still queue),
- * this is just a visible nudge to sign in rather than a wall blocking
- * everything. Self-contained (creates its own DOM element) so it works
- * regardless of what page/layout conventions the surrounding app uses.
+ * first: reads still fall back to local cache, writes still queue).
+ * Rather than a fixed banner (which risked covering page controls),
+ * this updates the existing "Sign In" sidebar/mobile-menu items to a
+ * visible not-signed-in state, and opens a small centered dialog with
+ * the actual email/password form only when clicked -- nothing fixed or
+ * overlapping sits on screen the rest of the time.
  */
-function showSignInBanner() {
-  let banner = document.getElementById("fieldscan-signin-banner");
-  if (banner) { banner.style.display = "flex"; return; } // already shown
-  banner = document.createElement("div");
-  banner.id = "fieldscan-signin-banner";
-  banner.style.cssText =
-    "position:fixed;top:0;left:0;right:0;z-index:8000;" +
-    "background:#b45309;color:#fff;padding:10px 16px;" +
-    "display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;" +
-    "font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2);";
+function setSignInMenuState(signedIn) {
+  const desktopBtn = document.getElementById("sidebar-signin-btn");
+  const mobileBtn = document.getElementById("mobile-signin-btn");
+  for (const btn of [desktopBtn, mobileBtn]) {
+    if (!btn) continue;
+    if (signedIn) {
+      btn.style.color = "";
+      btn.innerHTML = '<i class="fas fa-circle-check"></i> Signed In';
+    } else {
+      btn.style.color = "#b45309";
+      btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Sign In';
+    }
+  }
+}
 
-  const text = document.createElement("span");
-  text.textContent = "You're not signed in — some data may be out of date.";
+/**
+ * A small centered modal (not a fixed banner) with the actual email/
+ * password form. Opened by clicking the "Sign In" menu item, or
+ * automatically the first time a 401 is hit if it isn't already open.
+ */
+function openSignInDialog() {
+  if (document.getElementById("fieldscan-signin-dialog")) return; // already open
+
+  const overlay = document.createElement("div");
+  overlay.id = "fieldscan-signin-dialog";
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.5);" +
+    "display:flex;align-items:center;justify-content:center;";
+
+  const box = document.createElement("div");
+  box.style.cssText =
+    "background:#fff;border-radius:12px;padding:24px;max-width:340px;width:90%;" +
+    "box-shadow:0 8px 30px rgba(0,0,0,0.3);";
+
+  const title = document.createElement("h3");
+  title.textContent = "Sign In";
+  title.style.cssText = "margin:0 0 16px 0;";
 
   const emailInput = document.createElement("input");
   emailInput.type = "email";
   emailInput.placeholder = "Email";
   emailInput.autocomplete = "username";
-  emailInput.style.cssText = "padding:6px 10px;border-radius:6px;border:none;font-size:13px;width:160px;";
+  emailInput.style.cssText = "width:100%;box-sizing:border-box;padding:10px;margin-bottom:10px;border-radius:8px;border:1.5px solid var(--border, #ccc);font-size:14px;";
 
   const passwordInput = document.createElement("input");
   passwordInput.type = "password";
   passwordInput.placeholder = "Password";
   passwordInput.autocomplete = "current-password";
-  passwordInput.style.cssText = "padding:6px 10px;border-radius:6px;border:none;font-size:13px;width:140px;";
+  passwordInput.style.cssText = "width:100%;box-sizing:border-box;padding:10px;margin-bottom:10px;border-radius:8px;border:1.5px solid var(--border, #ccc);font-size:14px;";
 
-  const errorText = document.createElement("span");
-  errorText.style.cssText = "color:#fecaca;font-size:12px;display:none;width:100%;text-align:center;";
+  const errorText = document.createElement("div");
+  errorText.style.cssText = "color:#b91c1c;font-size:12px;display:none;margin-bottom:10px;";
 
-  const btn = document.createElement("button");
-  btn.textContent = "Sign In";
-  btn.style.cssText =
-    "background:#fff;color:#b45309;border:none;border-radius:6px;" +
-    "padding:6px 14px;font-weight:700;font-size:13px;cursor:pointer;";
+  const btnRow = document.createElement("div");
+  btnRow.style.cssText = "display:flex;gap:8px;";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.style.cssText = "flex:1;padding:10px;border-radius:8px;border:none;background:#f1f5f9;color:#334155;font-weight:600;cursor:pointer;";
+  cancelBtn.onclick = () => overlay.remove();
+
+  const submitBtn = document.createElement("button");
+  submitBtn.type = "button";
+  submitBtn.textContent = "Sign In";
+  submitBtn.style.cssText = "flex:1;padding:10px;border-radius:8px;border:none;background:#b45309;color:#fff;font-weight:700;cursor:pointer;";
 
   const attemptLogin = async () => {
     errorText.style.display = "none";
     if (!emailInput.value || !passwordInput.value) return;
-    btn.disabled = true;
-    btn.textContent = "Signing in...";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Signing in...";
     try {
       await login(emailInput.value.trim(), passwordInput.value);
-      // login() only clears the banner's job by resolving -- there's no
-      // single "refresh the current view" hook this file can call
-      // generically across every page. A full reload is blunt, but
-      // it's the one thing guaranteed to make every page re-fetch with
-      // the now-valid token, rather than silently continuing to show
-      // whatever empty/stale result it got before signing in.
+      // Same reasoning as before: a full reload is the one thing
+      // guaranteed to make every page re-fetch with the now-valid
+      // token, rather than continuing to show stale/empty results.
       window.location.reload();
     } catch (e) {
       errorText.textContent = e.message || "Sign-in failed";
       errorText.style.display = "block";
-      btn.disabled = false;
-      btn.textContent = "Sign In";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
     }
   };
-  btn.onclick = attemptLogin;
+  submitBtn.onclick = attemptLogin;
   passwordInput.addEventListener("keydown", (ev) => { if (ev.key === "Enter") attemptLogin(); });
 
-  banner.appendChild(text);
-  banner.appendChild(emailInput);
-  banner.appendChild(passwordInput);
-  banner.appendChild(btn);
-  banner.appendChild(errorText);
-  document.body.appendChild(banner);
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(submitBtn);
+  box.appendChild(title);
+  box.appendChild(emailInput);
+  box.appendChild(passwordInput);
+  box.appendChild(errorText);
+  box.appendChild(btnRow);
+  overlay.appendChild(box);
+  overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  emailInput.focus();
 }
-
-function hideSignInBanner() {
-  const banner = document.getElementById("fieldscan-signin-banner");
-  if (banner) banner.style.display = "none";
-}
+window.openSignInDialog = openSignInDialog;
 
 /**
  * Runs once when the app loads: checks whether there's a saved session
- * token and shows the banner if not. An expired/missing session only
- * ever showing up as silent 401s in the console (instead of something
- * the user can act on) is exactly the gap this closes.
+ * token and updates the menu indicator accordingly. An expired/missing
+ * session only ever showing up as silent 401s in the console (instead
+ * of something the user can act on) is exactly the gap this closes.
  */
 async function checkAuthOnStartup() {
   try {
     const token = await getSessionToken();
-    if (token) hideSignInBanner();
-    else showSignInBanner();
+    setSignInMenuState(!!token);
   } catch (e) {
-    showSignInBanner();
+    setSignInMenuState(false);
   }
 }
 if (document.readyState === "loading") {
@@ -355,7 +386,7 @@ async function callApi(action, data = {}) {
   }
   if (!response.ok) {
     console.warn(`callApi [${action}] HTTP ${response.status}`);
-    if (response.status === 401) showSignInBanner();
+    if (response.status === 401) setSignInMenuState(false);
     if (isGet)
       return readBackup(
         action,
