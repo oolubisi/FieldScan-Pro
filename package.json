@@ -1,0 +1,39 @@
+{
+  "name": "fieldscan-pro",
+  "version": "1.0.0",
+  "description": "Construction field management app for projects, inspections, take-offs, and financial tracking.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.fieldscan.pro",
+    "productName": "FieldScan Pro",
+    "files": [
+      "**/*",
+      "!node_modules/electron-builder/**",
+      "!.git/**"
+    ],
+    "mac": {
+      "icon": "icon-512.png",
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "icon": "icon-512.png",
+      "target": "nsis"
+    },
+    "linux": {
+      "icon": "icon-512.png",
+      "target": "AppImage",
+      "category": "Office"
+    }
+  }
+}

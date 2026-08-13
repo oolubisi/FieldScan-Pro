@@ -1,0 +1,16 @@
+# Electron dependencies -- huge (150-300MB+), never belongs in git,
+# npm install regenerates it from package.json/package-lock.json anyway.
+node_modules/
+
+# backend/api has its OWN separate git repo (FieldScanPro-Api) --
+# excluded here so it doesn't get pulled into this repo too, and so a
+# plain "git add ." in this folder doesn't trip over an embedded repo.
+backend/
+
+# OS clutter
+.DS_Store
+Thumbs.db
+
+# Build output, if you ever run electron-builder from this folder
+dist/
+out/
