@@ -130,7 +130,7 @@
 
         <span class="nav-divider nav-divider-bottom"></span>
 
-        <button id="sidebar-signin-btn" class="segment-btn" onclick="window.openSignInDialog()" style="color:#b45309;">
+        <button id="sidebar-signin-btn" class="segment-btn" onclick="window.handleSignInMenuClick()" style="color:#b45309;">
           <i class="fas fa-right-to-bracket"></i> Sign In
         </button>
         <button class="segment-btn" data-page="print-layouts" onclick="showPage('print-layouts')">
@@ -193,7 +193,7 @@
           <div class="mobile-more-item" onclick="closeMobileMoreSheet(); refreshAllData();">
             <i class="fas fa-database"></i> Refresh Data
           </div>
-          <div id="mobile-signin-btn" class="mobile-more-item" onclick="closeMobileMoreSheet(); window.openSignInDialog();" style="color:#b45309;">
+          <div id="mobile-signin-btn" class="mobile-more-item" onclick="closeMobileMoreSheet(); window.handleSignInMenuClick();" style="color:#b45309;">
             <i class="fas fa-right-to-bracket"></i> Sign In
           </div>
           <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('help');">
@@ -510,6 +510,15 @@
           </div>
         </div>
         <div class="card">
+          <h3 style="margin:0 0 8px 0;">Company Details</h3>
+          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px;">
+            Name, logo, address, phone, email, and tax details shown on every document you generate.
+          </p>
+          <button class="action-btn" style="width: auto; padding: 8px 16px; font-size: 13px;" onclick="window.openCompanyDetailsDialog()">
+            <i class="fas fa-building"></i> Edit Company Details
+          </button>
+        </div>
+        <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <h3 style="margin:0;">Payment Details</h3>
             <button id="payment-details-edit-btn" class="action-btn" style="width:auto; padding:6px 14px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.togglePaymentDetailsEdit()">
@@ -627,6 +636,7 @@
               <option value="piping">Bathroom Piping</option>
               <option value="electrical">Low Voltage Electrical</option>
               <option value="firealarm">Fire Alarm</option>
+              <option value="rebar">Rebar Weight Converter</option>
             </select>
             <div id="calc-input-container" style="margin-top: 14px;"></div>
           </div>

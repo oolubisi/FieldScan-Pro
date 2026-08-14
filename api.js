@@ -221,14 +221,155 @@ function setSignInMenuState(signedIn) {
   for (const btn of [desktopBtn, mobileBtn]) {
     if (!btn) continue;
     if (signedIn) {
-      btn.style.color = "";
+      btn.style.color = "#16a34a";
       btn.innerHTML = '<i class="fas fa-circle-check"></i> Signed In';
     } else {
       btn.style.color = "#b45309";
       btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Sign In';
     }
   }
+  if (signedIn) resetInactivityTimer();
+  else {
+    isCurrentlySignedIn = false;
+    clearInactivityTimers();
+  }
 }
+
+/**
+ * Clicking the same sidebar/mobile menu item does different things
+ * depending on current state: opens the sign-in dialog if signed out,
+ * or signs out (with confirmation) if currently signed in.
+ */
+function handleSignInMenuClick() {
+  if (isCurrentlySignedIn) logout(false);
+  else openSignInDialog();
+}
+window.handleSignInMenuClick = handleSignInMenuClick;
+
+/**
+ * Clears the session (Electron's encrypted token file via IPC, or plain
+ * localStorage for the browser/PWA case) and reloads. Deliberately does
+ * NOT clear the remembered email -- that's a separate, independent
+ * convenience (see openSignInDialog's pre-fill) that should survive a
+ * normal sign-out, same as most apps remember your username across
+ * logins.
+ *
+ * @param {boolean} silent - true for an automatic (inactivity) logout,
+ *   which should never block on a confirm() dialog; false for a manual
+ *   click on the "Signed In" menu item, which does confirm first since
+ *   an accidental click shouldn't silently sign someone out mid-task.
+ */
+async function logout(silent) {
+  if (!silent && !confirm("Sign out?")) return;
+  clearInactivityTimers();
+  if (window.electronAuth && typeof window.electronAuth.signOut === "function") {
+    await window.electronAuth.signOut();
+  } else {
+    localStorage.removeItem("fieldscan_session_token");
+  }
+  window.location.reload();
+}
+window.logout = logout;
+
+// ===== Inactivity auto-logout =====
+// 15 minutes total: a warning appears at the 14-minute mark with a 60s
+// countdown, giving a chance to cancel before the actual logout at the
+// 15-minute mark. Only runs while actually signed in (see
+// setSignInMenuState above) -- there's nothing to time out otherwise.
+const INACTIVITY_WARNING_MS = 14 * 60 * 1000;
+const INACTIVITY_LOGOUT_MS = 60 * 1000;
+let inactivityWarnTimer = null;
+let inactivityLogoutTimer = null;
+let inactivityCountdownInterval = null;
+let isCurrentlySignedIn = false;
+
+function clearInactivityTimers() {
+  if (inactivityWarnTimer) clearTimeout(inactivityWarnTimer);
+  if (inactivityLogoutTimer) clearTimeout(inactivityLogoutTimer);
+  if (inactivityCountdownInterval) clearInterval(inactivityCountdownInterval);
+  inactivityWarnTimer = null;
+  inactivityLogoutTimer = null;
+  inactivityCountdownInterval = null;
+  hideInactivityWarning();
+}
+
+function resetInactivityTimer() {
+  isCurrentlySignedIn = true;
+  clearInactivityTimers();
+  inactivityWarnTimer = setTimeout(showInactivityWarning, INACTIVITY_WARNING_MS);
+}
+
+function showInactivityWarning() {
+  // Explicit request: someone actively working OFFLINE (no signal, e.g.
+  // filling inspection forms on site) should never get logged out --
+  // rather than guess at every possible "still working" event, the
+  // simplest robust rule is: don't even start the warning while
+  // offline, just check again later. Real user activity (typing,
+  // tapping, scrolling) resets the timer as normal regardless of
+  // connection state; this only guards the case where someone is
+  // reading/reviewing something for a while without triggering one of
+  // the tracked events.
+  if (!navigator.onLine) {
+    inactivityWarnTimer = setTimeout(showInactivityWarning, INACTIVITY_WARNING_MS);
+    return;
+  }
+
+  let secondsLeft = Math.floor(INACTIVITY_LOGOUT_MS / 1000);
+  const banner = document.createElement("div");
+  banner.id = "inactivity-warning-banner";
+  banner.style.cssText =
+    "position:fixed;bottom:16px;right:16px;z-index:9000;background:#111827;color:#fff;" +
+    "padding:12px 16px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.3);" +
+    "font-size:13px;display:flex;align-items:center;gap:12px;max-width:300px;";
+  const text = document.createElement("span");
+  text.id = "inactivity-warning-text";
+  text.textContent = `Signing out in ${secondsLeft}s due to inactivity`;
+  const stayBtn = document.createElement("button");
+  stayBtn.textContent = "Stay signed in";
+  stayBtn.style.cssText = "background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;";
+  stayBtn.onclick = resetInactivityTimer;
+  banner.appendChild(text);
+  banner.appendChild(stayBtn);
+  document.body.appendChild(banner);
+
+  inactivityCountdownInterval = setInterval(() => {
+    secondsLeft--;
+    const textEl = document.getElementById("inactivity-warning-text");
+    if (textEl) textEl.textContent = `Signing out in ${secondsLeft}s due to inactivity`;
+    if (secondsLeft <= 0) clearInterval(inactivityCountdownInterval);
+  }, 1000);
+
+  inactivityLogoutTimer = setTimeout(() => {
+    // Same offline exception applies here -- if connectivity dropped
+    // during the 60s warning itself, don't log out; just go back to
+    // watching for real inactivity.
+    if (!navigator.onLine) {
+      resetInactivityTimer();
+      return;
+    }
+    logout(true);
+  }, INACTIVITY_LOGOUT_MS);
+}
+
+function hideInactivityWarning() {
+  const banner = document.getElementById("inactivity-warning-banner");
+  if (banner) banner.remove();
+}
+
+// Any real user activity resets the timer -- throttled to at most once
+// every 5s so a held-down key or a mouse being moved across the screen
+// doesn't churn through timer resets on every single event.
+let lastActivityResetAt = 0;
+function onUserActivity() {
+  if (!isCurrentlySignedIn) return;
+  const now = Date.now();
+  if (now - lastActivityResetAt < 5000) return;
+  lastActivityResetAt = now;
+  resetInactivityTimer();
+}
+["mousemove", "keydown", "click", "touchstart", "scroll"].forEach((evt) =>
+  document.addEventListener(evt, onUserActivity, { passive: true }),
+);
 
 /**
  * A small centered modal (not a fixed banner) with the actual email/
@@ -257,13 +398,32 @@ function openSignInDialog() {
   emailInput.type = "email";
   emailInput.placeholder = "Email";
   emailInput.autocomplete = "username";
+  emailInput.value = localStorage.getItem("fieldscan_user_email") || "";
   emailInput.style.cssText = "width:100%;box-sizing:border-box;padding:10px;margin-bottom:10px;border-radius:8px;border:1.5px solid var(--border, #ccc);font-size:14px;";
 
   const passwordInput = document.createElement("input");
   passwordInput.type = "password";
   passwordInput.placeholder = "Password";
   passwordInput.autocomplete = "current-password";
-  passwordInput.style.cssText = "width:100%;box-sizing:border-box;padding:10px;margin-bottom:10px;border-radius:8px;border:1.5px solid var(--border, #ccc);font-size:14px;";
+  passwordInput.style.cssText = "width:100%;box-sizing:border-box;padding:10px 40px 10px 10px;margin-bottom:10px;border-radius:8px;border:1.5px solid var(--border, #ccc);font-size:14px;";
+
+  const passwordWrap = document.createElement("div");
+  passwordWrap.style.cssText = "position:relative;";
+  const togglePasswordBtn = document.createElement("button");
+  togglePasswordBtn.type = "button";
+  togglePasswordBtn.innerHTML = '<i class="fas fa-eye"></i>';
+  togglePasswordBtn.setAttribute("aria-label", "Show password");
+  togglePasswordBtn.style.cssText =
+    "position:absolute;right:8px;top:50%;transform:translateY(-50%);" +
+    "background:none;border:none;color:#64748b;cursor:pointer;padding:4px;font-size:14px;";
+  togglePasswordBtn.onclick = () => {
+    const showing = passwordInput.type === "text";
+    passwordInput.type = showing ? "password" : "text";
+    togglePasswordBtn.innerHTML = showing ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+    togglePasswordBtn.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+  };
+  passwordWrap.appendChild(passwordInput);
+  passwordWrap.appendChild(togglePasswordBtn);
 
   const errorText = document.createElement("div");
   errorText.style.cssText = "color:#b91c1c;font-size:12px;display:none;margin-bottom:10px;";
@@ -307,13 +467,13 @@ function openSignInDialog() {
   btnRow.appendChild(submitBtn);
   box.appendChild(title);
   box.appendChild(emailInput);
-  box.appendChild(passwordInput);
+  box.appendChild(passwordWrap);
   box.appendChild(errorText);
   box.appendChild(btnRow);
   overlay.appendChild(box);
   overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
-  emailInput.focus();
+  (emailInput.value ? passwordInput : emailInput).focus();
 }
 window.openSignInDialog = openSignInDialog;
 
@@ -377,10 +537,24 @@ async function callApi(action, data = {}) {
         cleanData,
       );
     await queueOfflineRequest(action, cleanData);
-    applyLocalMutation(action, cleanData);
+    const tempIdInfo = applyLocalMutation(action, cleanData);
     updateSyncStatus();
     showSyncToast("📴 Offline: saved locally. Will sync when back online.");
-    return { status: "queued" };
+    // success:true (not just status:"queued") so the many existing call
+    // sites across the app that check `if (!resp.success)` keep working
+    // unchanged instead of misreporting a successful offline queue as a
+    // failure -- that mismatch was a real, separate bug found while
+    // making creation flows work offline. When this was a brand-new
+    // item (not an update/delete), the temp id from applyLocalMutation
+    // is echoed back under its real field name (e.g. estimateId,
+    // taskId) so the calling code can keep going -- opening or
+    // referencing the new item -- exactly as if the save had returned
+    // from the server normally.
+    return {
+      success: true,
+      status: "queued",
+      ...(tempIdInfo ? { [tempIdInfo.idKey]: tempIdInfo.idVal } : {}),
+    };
   } finally {
     clearTimeout(timeoutId);
   }

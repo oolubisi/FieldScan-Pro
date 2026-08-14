@@ -95,6 +95,14 @@ const CALC_DEFAULTS = {
     conventionalZonesPerPanel: 8,
     deviceSparePercent: 0.05,
   },
+  rebar: {
+    stockLengthM: 12, // standard stock/market length per rod; varies by supplier/market, hence editable
+    // Standard formula: weight per metre (kg/m) = diameter(mm)^2 / weightDivisor.
+    // 162 is the widely-used construction-industry constant, derived from
+    // mild steel density (~7850 kg/m^3) and a bar's circular cross-section
+    // -- left editable in case a different steel grade/density is ever needed.
+    weightDivisor: 162,
+  },
 };
 
 const PIPING_FIXTURES = [
@@ -221,6 +229,7 @@ function switchCalculator(type) {
     piping: renderPipingCalculator,
     electrical: renderElectricalCalculator,
     firealarm: renderFireAlarmCalculator,
+    rebar: renderRebarCalculator,
   };
   if (renderers[type]) renderers[type](container);
 }
@@ -1451,3 +1460,144 @@ function resetCalculatorConstants() {
   if (select && select.value) switchCalculator(select.value);
 }
 window.resetCalculatorConstants = resetCalculatorConstants;
+
+// ===== REBAR WEIGHT CONVERTER =====
+// Standard site formula: weight per metre (kg/m) = diameter(mm)^2 / 162
+// -- converts either way: (diameter + number of rods) -> total kg, or
+// (diameter + total kg) -> number of rods, using an editable stock
+// length per rod (default 12m, a common market standard) either way.
+
+const REBAR_STANDARD_SIZES = [6, 8, 10, 12, 16, 20, 25, 32, 40];
+
+function renderRebarCalculator(container) {
+  container.innerHTML = `
+    <div id="rebar-elements-container"></div>
+    <button class="action-btn" style="width:auto; padding:8px 16px; font-size:13px; background:var(--card-light); color:var(--text);" onclick="window.addRebarElement()">
+      <i class="fas fa-plus"></i> Add Bar Size
+    </button>
+    <button class="action-btn" style="margin-top:14px; width:auto; padding:12px 24px;" onclick="window.calculateRebar()">
+      <i class="fas fa-calculator"></i> Calculate
+    </button>
+  `;
+  CALC_CARD_ADD_FNS["rebar-elements-container"] = addRebarElement;
+  addRebarElement();
+}
+window.renderRebarCalculator = renderRebarCalculator;
+
+function addRebarElement() {
+  const container = document.getElementById("rebar-elements-container");
+  if (!container) return;
+  const id = `rebarel${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const c = getCalcConstants().rebar;
+
+  const sizeOptions = REBAR_STANDARD_SIZES.map((d) => `<option value="${d}">${d}mm</option>`).join("");
+
+  const body = `
+    <label style="display:block; font-weight:800; margin-bottom:4px;">Bar Diameter</label>
+    <select class="rb-diameter">
+      ${sizeOptions}
+      <option value="custom">Other (enter below)</option>
+    </select>
+    <input type="number" class="rb-diameter-custom" min="1" step="0.1" placeholder="Diameter in mm" style="margin-top:6px; display:none;">
+
+    <label style="display:block; font-weight:800; margin-top:10px; margin-bottom:4px;">Convert</label>
+    <select class="rb-mode" onchange="window.toggleRebarMode('${id}')">
+      <option value="toKg">Diameter + Number of Rods → Total kg</option>
+      <option value="toRods">Diameter + Total kg → Number of Rods</option>
+    </select>
+
+    <label style="display:block; font-weight:800; margin-top:10px; margin-bottom:4px;">Stock Length per Rod (m)</label>
+    <input type="number" class="rb-stock-length" min="0.1" step="0.1" value="${c.stockLengthM}">
+
+    <div class="rb-qty-row" style="margin-top:10px;">
+      <label style="display:block; font-weight:800; margin-bottom:4px;">Number of Rods</label>
+      <input type="number" class="rb-quantity" min="0" step="1" value="0">
+    </div>
+    <div class="rb-weight-row" style="margin-top:10px; display:none;">
+      <label style="display:block; font-weight:800; margin-bottom:4px;">Total Weight (kg)</label>
+      <input type="number" class="rb-weight" min="0" step="0.01" value="0">
+    </div>
+  `;
+
+  container.insertAdjacentHTML("beforeend", buildCardShellHtml(id, "rebar-elements-container", "Bar Size (e.g. Columns)", body));
+  const row = container.querySelector(`.calc-card-row[data-card-id="${id}"]`);
+  const diameterSelect = row.querySelector(".rb-diameter");
+  const diameterCustom = row.querySelector(".rb-diameter-custom");
+  diameterSelect.addEventListener("change", () => {
+    diameterCustom.style.display = diameterSelect.value === "custom" ? "block" : "none";
+  });
+}
+window.addRebarElement = addRebarElement;
+
+function toggleRebarMode(id) {
+  const row = document.querySelector(`.calc-card-row[data-card-id="${id}"]`);
+  if (!row) return;
+  const mode = row.querySelector(".rb-mode").value;
+  row.querySelector(".rb-qty-row").style.display = mode === "toKg" ? "block" : "none";
+  row.querySelector(".rb-weight-row").style.display = mode === "toRods" ? "block" : "none";
+}
+window.toggleRebarMode = toggleRebarMode;
+
+function calculateRebar() {
+  const rows = document.querySelectorAll("#rebar-elements-container .calc-card-row");
+  if (!rows.length) {
+    alert("Add at least one bar size");
+    return;
+  }
+  const c = getCalcConstants().rebar;
+
+  const lines = [];
+  let grandTotalKg = 0;
+  let anyEntered = false;
+
+  rows.forEach((row, idx) => {
+    const name = row.querySelector(".calc-card-name").value.trim() || `Bar Size ${idx + 1}`;
+    const diameterSelect = row.querySelector(".rb-diameter");
+    const diameter = diameterSelect.value === "custom"
+      ? Number(row.querySelector(".rb-diameter-custom").value) || 0
+      : Number(diameterSelect.value) || 0;
+    const stockLength = Number(row.querySelector(".rb-stock-length").value) || c.stockLengthM;
+    const mode = row.querySelector(".rb-mode").value;
+    const kgPerMetre = (diameter * diameter) / c.weightDivisor;
+
+    if (!diameter || !kgPerMetre) return;
+
+    if (mode === "toKg") {
+      const quantity = Number(row.querySelector(".rb-quantity").value) || 0;
+      if (!quantity) return;
+      anyEntered = true;
+      const totalLength = quantity * stockLength;
+      const totalKg = totalLength * kgPerMetre;
+      grandTotalKg += totalKg;
+      lines.push(
+        `${name}: Y${diameter} × ${quantity} rods @ ${fmtNum(stockLength, 1)}m = ${fmtNum(totalLength, 1)}m → ${fmtNum(totalKg, 1)} kg (${fmtNum(kgPerMetre, 3)} kg/m)`,
+      );
+    } else {
+      const totalKg = Number(row.querySelector(".rb-weight").value) || 0;
+      if (!totalKg) return;
+      anyEntered = true;
+      const totalLength = totalKg / kgPerMetre;
+      const rodsExact = totalLength / stockLength;
+      const rodsToBuy = Math.ceil(rodsExact); // you can't buy a fraction of a stock-length rod
+      grandTotalKg += totalKg;
+      lines.push(
+        `${name}: Y${diameter}, ${fmtNum(totalKg, 1)} kg (${fmtNum(kgPerMetre, 3)} kg/m) = ${fmtNum(totalLength, 1)}m → ${fmtNum(rodsExact, 2)} rods @ ${fmtNum(stockLength, 1)}m (buy ${rodsToBuy} whole rods)`,
+      );
+    }
+  });
+
+  if (!anyEntered) {
+    alert("Enter a quantity or weight for at least one bar size");
+    return;
+  }
+
+  const output =
+    `REBAR WEIGHT CONVERSION\n` +
+    `Formula: kg/m = diameter(mm)² ÷ ${c.weightDivisor}\n\n` +
+    lines.join("\n") +
+    `\n\nGRAND TOTAL: ${fmtNum(grandTotalKg, 1)} kg (${fmtNum(grandTotalKg / 1000, 3)} tonnes)`;
+
+  showCalcOutput(output);
+}
+window.calculateRebar = calculateRebar;
+

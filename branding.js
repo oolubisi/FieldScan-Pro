@@ -15,9 +15,65 @@ function _getSettings() {
   return cache.settings || {};
 }
 
+/**
+ * Single source of truth for company letterhead details (name, address,
+ * phone1/2, email, TIN, VAT registration number, slogan, registration
+ * number). Settings first, falling back to the original hardcoded
+ * BRANDING defaults for the five fields that existed before Company
+ * Details was built -- so nothing goes blank for anyone who hasn't
+ * filled in the new Settings dialog yet. The four brand-new fields
+ * (TIN, VAT number, slogan, registration number) have no old hardcoded
+ * equivalent, so they simply default to empty until set.
+ *
+ * Synchronous on purpose -- unlike logo/signature, none of these need
+ * an image fetch; settings are already sitting in cache by the time
+ * any document gets generated.
+ */
+function _getCompanyDetails() {
+  const settings = _getSettings();
+  const data = settings && settings.data ? settings.data : settings;
+  return {
+    // These 4 are the only ones any document currently reads. Blank ->
+    // a bracketed placeholder label, NOT the original hardcoded
+    // real-world address/phone/email -- silently showing one specific
+    // company's actual details to every other company using this app
+    // whenever they hadn't filled in Settings yet was the actual bug
+    // here, not just "missing a fallback."
+    address: data.CompanyAddress || "[Address]",
+    phone1: data.CompanyPhone1 || "[Phone 1]",
+    phone2: data.CompanyPhone2 || "[Phone 2]",
+    email: data.CompanyEmail || "[Email]",
+    // Not yet used anywhere (see prior note) -- left as empty string
+    // rather than a placeholder, since an unused field showing
+    // "[Company Name]" in some future spot with no context would be
+    // more confusing than helpful until it's actually wired in.
+    name: data.CompanyName || "",
+    tin: data.CompanyTIN || "",
+    vatNumber: data.CompanyVatNumber || "",
+    slogan: data.CompanySlogan || "",
+    registrationNumber: data.CompanyRegistrationNumber || "",
+  };
+}
+
 async function _getLogoUrl() {
   const settings = _getSettings();
-  return settings.Logo ? await resolveImageToDataUrl(settings.Logo) : "";
+  const data = settings && settings.data ? settings.data : settings;
+  return data.Logo ? await resolveImageToDataUrl(data.Logo) : "";
+}
+
+/**
+ * Multiplier applied to the logo's display size on every generated
+ * document -- 1.0 is the original size, adjustable in 0.1 steps from
+ * Settings. Bounded defensively here too (not just at the input's own
+ * min/max) in case a stale/unexpected value ever comes back from the
+ * server -- 0 or a negative number would make the logo invisible or
+ * render nonsensically.
+ */
+function _getLogoSizeFactor() {
+  const settings = _getSettings();
+  const data = settings && settings.data ? settings.data : settings;
+  const factor = Number(data.LogoSizeFactor);
+  return factor > 0 ? factor : 1.0;
 }
 
 // Lazily fetched once per app session and cached in memory -- avoids a
@@ -71,8 +127,9 @@ async function _getSignatoryName() {
 async function generateLogoBlock() {
   const logoUrl = await _getLogoUrl();
   if (!logoUrl) return `<div style="height: 90px;"></div>`;
+  const f = _getLogoSizeFactor();
   return `<div style="display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 28px;">
-    <img src="${escapeAttr(logoUrl)}" style="height: 120px; max-width: 200px; object-fit: contain; display: block;" onerror="this.style.display='none'">
+    <img src="${escapeAttr(logoUrl)}" style="height: ${Math.round(120 * f)}px; max-width: ${Math.round(200 * f)}px; object-fit: contain; display: block;" onerror="this.style.display='none'">
   </div>`;
 }
 
@@ -80,6 +137,7 @@ async function generateLogoBlock() {
  * Unified footer — fixed position at bottom.
  */
 function generateUnifiedFooter() {
+  const c = _getCompanyDetails();
   return `<div class="unified-footer" style="
     position: absolute;
     bottom: 5mm;
@@ -92,11 +150,11 @@ function generateUnifiedFooter() {
     color: #444;
     line-height: 1.6;
   ">
-    <div>&#128205; ${escapeHtml(BRANDING.address)}</div>
+    <div>&#128205; ${escapeHtml(c.address)}</div>
     <div>
-      &#128222; ${escapeHtml(BRANDING.phone1)} &nbsp;&nbsp;&nbsp;
-      &#128222; ${escapeHtml(BRANDING.phone2)} &nbsp;&nbsp;&nbsp;
-      &#9993; ${escapeHtml(BRANDING.email)}
+      &#128222; ${escapeHtml(c.phone1)} &nbsp;&nbsp;&nbsp;
+      &#128222; ${escapeHtml(c.phone2)} &nbsp;&nbsp;&nbsp;
+      &#9993; ${escapeHtml(c.email)}
     </div>
   </div>`;
 }
@@ -169,6 +227,8 @@ async function wrapUnifiedPage(bodyContent, options) {
 
 // Expose to global scope
 window.BRANDING = BRANDING;
+window._getCompanyDetails = _getCompanyDetails;
+window._getLogoSizeFactor = _getLogoSizeFactor;
 window.generateLogoBlock = generateLogoBlock;
 window.generateUnifiedFooter = generateUnifiedFooter;
 window.generateUnifiedSignatureBlock = generateUnifiedSignatureBlock;

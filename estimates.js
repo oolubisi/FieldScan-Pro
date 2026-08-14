@@ -997,8 +997,10 @@ async function renderEstimateReportDoc(est) {
   const cache = getCache();
   const settings = cache.settings && cache.settings.data ? cache.settings.data : cache.settings || {};
   const logoUrl = settings.Logo ? await resolveImageToDataUrl(settings.Logo) : "";
-  const contactLine = "Road 1 House 5B, Isheri-Brooks Estate,<br>Isheri-Olofin, Ogun State";
-  const contactLine2 = "pi.projects20@gmail.com | 0708 260 8103";
+  const logoSizeFactor = _getLogoSizeFactor();
+  const c = _getCompanyDetails();
+  const contactLine = escapeHtml(c.address).replace(/\n/g, "<br>");
+  const contactLine2 = c.email + " | " + c.phone1; // escaped once, downstream
 
   const lineItems = safeParseJsonArray(est.lineItems);
   const mode = est.subtotalMode === "grouped" ? "grouped" : "single";
@@ -1061,7 +1063,7 @@ async function renderEstimateReportDoc(est) {
     '<div class="report-page-wrapper"><div class="report-content" style="padding-bottom:22mm;">' +
     '<div style="display:flex; justify-content:flex-end;">' +
     '<div style="text-align:right; flex-shrink:0;">' +
-    (logoUrl ? '<img src="' + escapeAttr(logoUrl) + '" style="max-height:80px; max-width:200px; object-fit:contain;" onerror="this.style.display=\'none\'">' : "") +
+    (logoUrl ? '<img src="' + escapeAttr(logoUrl) + '" style="max-height:' + Math.round(80 * logoSizeFactor) + 'px; max-width:' + Math.round(200 * logoSizeFactor) + 'px; object-fit:contain;" onerror="this.style.display=\'none\'">' : "") +
     '<div style="font-size:10px; color:#495057; margin-top:4px;">' + contactLine + '<br>' + escapeHtml(contactLine2) + '</div></div></div>' +
     '<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:18px; gap:20px;">' +
     '<div style="font-size:12px; line-height:1.6; max-width:45mm; overflow-wrap:break-word; word-wrap:break-word;"><strong style="font-size:14px;">' + escapeHtml(est.clientName || "") + '</strong><br>' + addressLines + '</div>' +

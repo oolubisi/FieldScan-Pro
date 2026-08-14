@@ -432,10 +432,11 @@ async function generateReportHeader(title, project, settings) {
   });
   const logoUrl =
     settings && settings.Logo ? await resolveImageToDataUrl(settings.Logo) : "";
+  const logoSizeFactor = _getLogoSizeFactor();
   let html = `<div class="report-header" style="border-bottom: 2.5px solid #000; padding-bottom: 2px; margin-bottom: 18px;"><div style="display: flex; justify-content: space-between; align-items: flex-end;">`;
   html += `<div style="flex:1;"><div style="font-size: 11px; color: #495057; font-weight: 600; margin-bottom: 2px;">${escapeHtml(dateStr)}</div><div style="font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #495057; line-height: 1.1;">${escapeHtml(title)}</div></div>`;
   if (logoUrl) {
-    html += `<div style="flex-shrink:0; margin-left:16px; text-align:right;"><img src="${escapeAttr(logoUrl)}" style="max-height:120px; max-width:280px; object-fit:contain;" onerror="this.style.display='none'"></div>`;
+    html += `<div style="flex-shrink:0; margin-left:16px; text-align:right;"><img src="${escapeAttr(logoUrl)}" style="max-height:${Math.round(120 * logoSizeFactor)}px; max-width:${Math.round(280 * logoSizeFactor)}px; object-fit:contain;" onerror="this.style.display='none'"></div>`;
   }
   html += `</div>`;
   if (project)
@@ -451,7 +452,9 @@ async function generateFlowReportHeader(title, project, options = {}) {
       ? cache.settings.data
       : cache.settings || {};
   const logoUrl = settings.Logo ? await resolveImageToDataUrl(settings.Logo) : "";
-  const contactLine = "+234 809 260 8103 +234 708 260 8103 pi.projects20@gmail.com";
+  const logoSizeFactor = _getLogoSizeFactor();
+  const c = _getCompanyDetails();
+  const contactLine = `${c.phone1} ${c.phone2} ${c.email}`.trim();
   const dateLine = options.dateLine || "";
   const extraFields = options.extraFieldsHtml || "";
   return `<div class="report-header inspection-report-header" style="padding-bottom:10px; margin-bottom:18px;">
@@ -461,7 +464,7 @@ async function generateFlowReportHeader(title, project, options = {}) {
         <div style="font-size:19px; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:#212529; line-height:1.1;">${escapeHtml(title)}</div>
       </div>
       <div style="flex-shrink:0; text-align:right;">
-        ${logoUrl ? `<img src="${escapeAttr(logoUrl)}" style="max-height:86px; max-width:210px; object-fit:contain;" onerror="this.style.display='none'">` : ""}
+        ${logoUrl ? `<img src="${escapeAttr(logoUrl)}" style="max-height:${Math.round(86 * logoSizeFactor)}px; max-width:${Math.round(210 * logoSizeFactor)}px; object-fit:contain;" onerror="this.style.display='none'">` : ""}
         <div style="font-size:10px; color:#495057; font-weight:700; margin-top:4px; white-space:nowrap;">${escapeHtml(contactLine)}</div>
       </div>
     </div>
@@ -503,9 +506,10 @@ function generateReportFooter() {
       }
     } catch (e) {}
   }
+  const c = _getCompanyDetails();
   return `<div class="report-footer">
-    <div>Road 1 House 5B, Isheri-Brooks Estate, Isheri-Olofin, Ogun State</div>
-    <div>+234 809 260 8103&nbsp;&nbsp;&nbsp;+234 708 260 8103&nbsp;&nbsp;&nbsp;pi.projects20@gmail.com</div>
+    <div>${escapeHtml(c.address)}</div>
+    <div>${escapeHtml(c.phone1)}&nbsp;&nbsp;&nbsp;${escapeHtml(c.phone2)}&nbsp;&nbsp;&nbsp;${escapeHtml(c.email)}</div>
   </div>`;
 }
 
@@ -844,12 +848,10 @@ async function renderFinancialVendor(vendor, projects, workorders, payments) {
 async function renderScopeReport(project, settings) {
   // Normalize: getSettings returns {data: {...}} or the cache may hold the raw response
   if (settings && settings.data) settings = settings.data;
-  const signName =
-    settings && settings.Name_Signed ? escapeHtml(settings.Name_Signed) : "";
-  const signImg =
-    settings && settings.Sign_Signed
-      ? await resolveImageToDataUrl(settings.Sign_Signed)
-      : "";
+  const c = _getCompanyDetails();
+  // Per-user signature first, falling back to the company-wide one.
+  const signName = escapeHtml(await _getSignatoryName());
+  const signImg = await _getSignImageUrl();
   const hasSignature = signName || signImg;
 
   let signatureBlock = "";
@@ -869,8 +871,8 @@ async function renderScopeReport(project, settings) {
       ${signatureBlock}
     </div>
     <div class="report-footer">
-      <div style="font-weight: 700; margin-bottom: 4px;">Road 1 House 5B, Isheri-Brooks Estate, Isheri-Olofin, Ogun State</div>
-      <div>+234 809 260 8103&nbsp;&nbsp;&nbsp;+234 708 260 8103&nbsp;&nbsp;&nbsp;pi.projects20@gmail.com</div>
+      <div style="font-weight: 700; margin-bottom: 4px;">${escapeHtml(c.address)}</div>
+      <div>${escapeHtml(c.phone1)}&nbsp;&nbsp;&nbsp;${escapeHtml(c.phone2)}&nbsp;&nbsp;&nbsp;${escapeHtml(c.email)}</div>
     </div>
   </div>`;
 }
@@ -989,10 +991,18 @@ async function generateInspectionSignatureBlocks(inspectorName) {
     cache.settings && cache.settings.data
       ? cache.settings.data
       : cache.settings || {};
-  const signImageUrl = settings.Sign_Signed
-    ? await resolveImageToDataUrl(settings.Sign_Signed)
-    : "";
-  const finalName = inspectorName || settings.Name_Signed || "Kayode Olubisi";
+  // Per-user signature image first (see branding.js's _getSignImageUrl),
+  // falling back to the company-wide one only if this user hasn't set
+  // their own yet. This was the actual gap: every call site correctly
+  // passed a per-user NAME, but the image itself always came from the
+  // old company-wide Sign_Signed field regardless -- which nobody
+  // populates anymore now that My Signature exists, so no image ever
+  // showed up on estimates, inspections, or anything else routed
+  // through this shared function.
+  const signImageUrl = (typeof _getSignImageUrl === "function")
+    ? await _getSignImageUrl()
+    : (settings.Sign_Signed ? await resolveImageToDataUrl(settings.Sign_Signed) : "");
+  const finalName = inspectorName || (typeof _getSignatoryName === "function" ? await _getSignatoryName() : "") || settings.Name_Signed || "Kayode Olubisi";
   return `<div style="margin-top:16px; page-break-inside:avoid;">
     <div>
       ${signImageUrl ? `<div><img src="${escapeAttr(signImageUrl)}" style="max-height:54px; max-width:170px; object-fit:contain; display:block;" onerror="this.style.display='none'"></div>` : ""}
@@ -1504,11 +1514,11 @@ async function renderPcrReport(project, changeOrders, payments, mode) {
     cache.settings && cache.settings.data
       ? cache.settings.data
       : cache.settings || {};
+  const c = _getCompanyDetails();
   const logoUrl = settings.Logo ? await resolveImageToDataUrl(settings.Logo) : "";
-  const signImageUrl = settings.Sign_Signed
-    ? await resolveImageToDataUrl(settings.Sign_Signed)
-    : "";
-  const signatoryName = settings.Name_Signed || "";
+  // Per-user signature first, falling back to the company-wide one.
+  const signImageUrl = await _getSignImageUrl();
+  const signatoryName = await _getSignatoryName();
 
   // ── WHT toggle ───────────────────────────────────────────────────────────
   const showWht =
@@ -1704,8 +1714,8 @@ async function renderPcrReport(project, changeOrders, payments, mode) {
 
       <!-- ══ FOOTER ══════════════════════════════════════════════════════════ -->
       <div class="report-footer">
-        <div style="font-weight: 700; margin-bottom: 4px;">Road 1 House 5B, Isheri-Brooks Estate, Isheri-Olofin, Ogun State</div>
-        <div>+234 809 260 8103&nbsp;&nbsp;&nbsp;+234 708 260 8103&nbsp;&nbsp;&nbsp;pi.projects20@gmail.com</div>
+        <div style="font-weight: 700; margin-bottom: 4px;">${escapeHtml(c.address)}</div>
+        <div>${escapeHtml(c.phone1)}&nbsp;&nbsp;&nbsp;${escapeHtml(c.phone2)}&nbsp;&nbsp;&nbsp;${escapeHtml(c.email)}</div>
       </div>
 
     </div>

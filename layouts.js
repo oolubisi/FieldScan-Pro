@@ -320,12 +320,32 @@ function generateLayoutFooter(layout) {
   const cfg = layout.config;
   if (!cfg.showFooter) return "";
 
-  const addressLine = cfg.companyAddress
-    ? `<div>${escapeHtml(cfg.companyAddress)}</div>`
+  // DEFAULT_LAYOUTS is a module-level constant, evaluated at script-load
+  // time before settings are even fetched -- it can't call
+  // _getCompanyDetails() directly (there'd be nothing to read yet). So
+  // instead: if this layout's stored value is STILL the original
+  // hardcoded placeholder (meaning nobody's ever customized it), swap
+  // in the real, current company details at render time. Anything the
+  // user has actually typed here -- including the deliberately-blank
+  // no-branding layout, which never reaches this point at all since it
+  // uses footerText instead -- is respected as-is.
+  const STALE_DEFAULT_ADDRESS = "Road 1 House 5B, Isheri-Brooks Estate, Isheri-Olofin, Ogun State";
+  let companyAddress = cfg.companyAddress;
+  let companyPhones = cfg.companyPhones;
+  let companyEmail = cfg.companyEmail;
+  if (companyAddress === STALE_DEFAULT_ADDRESS && typeof _getCompanyDetails === "function") {
+    const c = _getCompanyDetails();
+    companyAddress = c.address;
+    companyPhones = [c.phone1, c.phone2].filter(Boolean).join("    ");
+    companyEmail = c.email;
+  }
+
+  const addressLine = companyAddress
+    ? `<div>${escapeHtml(companyAddress)}</div>`
     : "";
   const contactLine =
-    cfg.companyPhones || cfg.companyEmail
-      ? `<div>${escapeHtml(cfg.companyPhones || "")}${cfg.companyPhones && cfg.companyEmail ? "&nbsp;&nbsp;&nbsp;" : ""}${escapeHtml(cfg.companyEmail || "")}</div>`
+    companyPhones || companyEmail
+      ? `<div>${escapeHtml(companyPhones || "")}${companyPhones && companyEmail ? "&nbsp;&nbsp;&nbsp;" : ""}${escapeHtml(companyEmail || "")}</div>`
       : "";
 
   if (cfg.footerText) {

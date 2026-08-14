@@ -12,6 +12,14 @@ const GET_ACTION_BY_STORE = {
   clients: "getClients",
   boqItems: "getBOQItems",
   units: "getUnits",
+  tasks: "getTasks",
+  taskGroups: "getTaskGroups",
+  takeOffs: "getTakeOffs",
+  takeOffGroups: "getTakeOffGroups",
+  takeOffTemplates: "getTakeOffTemplates",
+  documents: "getDocuments",
+  photos: "getPhotos",
+  photoLinks: "getPhotoLinks",
 };
 
 const MUTATION_MAP = {
@@ -52,6 +60,34 @@ const MUTATION_MAP = {
   deleteBOQItem: { store: "boqItems", idKey: "boqItemId", mode: "delete" },
   saveUnit: { store: "units", idKey: "unitId", mode: "upsert" },
   deleteUnit: { store: "units", idKey: "unitId", mode: "delete" },
+  // Below: added for full offline-first coverage. Each one is called via
+  // a direct `await callApi(...)` somewhere in the app (not runInBackground,
+  // which manages its own optimistic updates independently and doesn't
+  // need an entry here -- see the comment on applyLocalMutation).
+  saveTask: { store: "tasks", idKey: "taskId", mode: "upsert" },
+  updateTask: { store: "tasks", idKey: "taskId", mode: "upsert" },
+  deleteTask: { store: "tasks", idKey: "taskId", mode: "delete" },
+  saveTaskGroup: { store: "taskGroups", idKey: "groupId", mode: "upsert" },
+  updateTaskGroup: { store: "taskGroups", idKey: "groupId", mode: "upsert" },
+  deleteTaskGroup: { store: "taskGroups", idKey: "groupId", mode: "delete" },
+  saveTakeOff: { store: "takeOffs", idKey: "takeOffId", mode: "upsert" },
+  updateTakeOff: { store: "takeOffs", idKey: "takeOffId", mode: "upsert" },
+  deleteTakeOff: { store: "takeOffs", idKey: "takeOffId", mode: "delete" },
+  saveTakeOffGroup: { store: "takeOffGroups", idKey: "groupId", mode: "upsert" },
+  updateTakeOffGroup: { store: "takeOffGroups", idKey: "groupId", mode: "upsert" },
+  deleteTakeOffGroup: { store: "takeOffGroups", idKey: "groupId", mode: "delete" },
+  saveTakeOffTemplate: { store: "takeOffTemplates", idKey: "templateId", mode: "upsert" },
+  deleteTakeOffTemplate: { store: "takeOffTemplates", idKey: "templateId", mode: "delete" },
+  saveDocument: { store: "documents", idKey: "documentId", mode: "upsert" },
+  updateDocumentMetadata: { store: "documents", idKey: "documentId", mode: "upsert" },
+  deleteDocument: { store: "documents", idKey: "documentId", mode: "delete" },
+  savePhoto: { store: "photos", idKey: "photoId", mode: "upsert" },
+  updatePhotoComment: { store: "photos", idKey: "photoId", mode: "upsert" },
+  updatePhotoMeta: { store: "photos", idKey: "photoId", mode: "upsert" },
+  deletePhoto: { store: "photos", idKey: "photoId", mode: "delete" },
+  savePhotoLink: { store: "photoLinks", idKey: "linkId", mode: "upsert" },
+  deletePhotoLink: { store: "photoLinks", idKey: "linkId", mode: "delete" },
+  deletePayment: { store: "payments", idKey: "paymentId", mode: "delete" },
 };
 
 function backupKey(action, params) {
@@ -87,20 +123,38 @@ function recomputeLocalStats() {
 
 function applyLocalMutation(action, data) {
   const cfg = MUTATION_MAP[action];
-  if (!cfg) return;
+  if (!cfg) return null;
   const getAction = GET_ACTION_BY_STORE[cfg.store];
   let current = readBackup(getAction, []);
-  const idVal = String(data[cfg.idKey] || "").trim();
-  if (cfg.mode === "delete")
+  let idVal = String(data[cfg.idKey] || "").trim();
+  if (cfg.mode === "delete") {
     current = current.filter((item) => !idsMatch(item[cfg.idKey], idVal));
-  else {
-    const idx = current.findIndex((item) => idsMatch(item[cfg.idKey], idVal));
-    const record = { ...data, offlinePending: true, lastModified: Date.now() };
-    if (idx === -1) current = [record, ...current];
-    else current[idx] = { ...current[idx], ...record };
+    writeBackup(getAction, current);
+    if (cfg.store === "vendors") recomputeLocalStats();
+    return null;
   }
+  // A brand-new item (create, not update) has no server-issued id yet --
+  // the server generates it once the queued request actually syncs.
+  // Without a stable per-item id here, every offline create in the same
+  // session would share the same empty idVal, and each new one would
+  // silently overwrite the previous one's local record instead of
+  // adding a new one. A temp id keeps them distinct until the real
+  // sync reconciles it with the server's actual id -- and is handed
+  // back to callApi() below so it can be echoed into the response,
+  // letting the calling page code keep working (e.g. showing/opening
+  // the new item) exactly as if the save had succeeded normally.
+  const isNew = !idVal;
+  if (isNew) {
+    idVal = "temp_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    data = { ...data, [cfg.idKey]: idVal };
+  }
+  const record = { ...data, offlinePending: true, lastModified: Date.now() };
+  const idx = current.findIndex((item) => idsMatch(item[cfg.idKey], idVal));
+  if (idx === -1) current = [record, ...current];
+  else current[idx] = { ...current[idx], ...record };
   writeBackup(getAction, current);
   if (cfg.store === "vendors") recomputeLocalStats();
+  return isNew ? { idKey: cfg.idKey, idVal } : null;
 }
 
 function fieldScanLocalKeys() {
@@ -463,3 +517,154 @@ function seedRestoredCacheFromBackups() {
   c.settings = readBackup("getSettings", c.settings || {});
   setCache(c);
 }
+
+// ===== Company Details dialog =====
+// A modal (not an inline Settings section, per request) covering the
+// letterhead fields every generated document actually reads: Name,
+// Logo, Address, Phone1/2, Email, TIN, VAT registration number, Slogan,
+// Registration number. Backed by the same updateSetting action as
+// everything else in Settings -- these just happen to be brand-new keys.
+
+let companyDetailsLogoData = ""; // holds the currently-selected (possibly unsaved) logo as a data URI
+
+function openCompanyDetailsDialog() {
+  if (document.getElementById("company-details-dialog")) return; // already open
+
+  const cache = getCache();
+  const settings = cache.settings && cache.settings.data ? cache.settings.data : cache.settings || {};
+  companyDetailsLogoData = settings.Logo || "";
+  const logoSizeFactorValue = Number(settings.LogoSizeFactor) > 0 ? Number(settings.LogoSizeFactor) : 1.0;
+
+  const overlay = document.createElement("div");
+  overlay.id = "company-details-dialog";
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.5);" +
+    "display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;";
+
+  const fieldDef = [
+    ["cd-name", "Company Name", settings.CompanyName || "", "text"],
+    ["cd-slogan", "Slogan", settings.CompanySlogan || "", "text"],
+    ["cd-address", "Address", settings.CompanyAddress || "", "textarea"],
+    ["cd-phone1", "Phone 1", settings.CompanyPhone1 || "", "text"],
+    ["cd-phone2", "Phone 2", settings.CompanyPhone2 || "", "text"],
+    ["cd-email", "Email", settings.CompanyEmail || "", "email"],
+    ["cd-tin", "TIN", settings.CompanyTIN || "", "text"],
+    ["cd-vat-number", "VAT Registration Number", settings.CompanyVatNumber || "", "text"],
+    ["cd-reg-number", "Registration Number", settings.CompanyRegistrationNumber || "", "text"],
+  ];
+
+  const fieldsHtml = fieldDef.map(([id, label, value, type]) => {
+    const escapedValue = escapeAttr(value);
+    const input = type === "textarea"
+      ? `<textarea id="${id}" rows="2" style="width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1.5px solid var(--border,#ccc);font-size:13px;font-family:inherit;">${escapeHtml(value)}</textarea>`
+      : `<input id="${id}" type="${type}" value="${escapedValue}" style="width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1.5px solid var(--border,#ccc);font-size:13px;">`;
+    return `<div style="margin-bottom:10px;"><label style="display:block;font-size:12px;font-weight:700;margin-bottom:3px;">${escapeHtml(label)}</label>${input}</div>`;
+  }).join("");
+
+  const box = document.createElement("div");
+  box.style.cssText =
+    "background:#fff;border-radius:12px;padding:22px;max-width:440px;width:100%;" +
+    "box-shadow:0 8px 30px rgba(0,0,0,0.3);max-height:90vh;overflow:auto;";
+
+  box.innerHTML = `
+    <h3 style="margin:0 0 16px 0;">Company Details</h3>
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;">Logo</label>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <img id="cd-logo-preview" src="${companyDetailsLogoData ? escapeAttr(companyDetailsLogoData) : ""}" style="max-height:50px;max-width:130px;object-fit:contain;border:1px solid var(--border,#ccc);border-radius:6px;padding:2px;background:#fff;${companyDetailsLogoData ? "" : "display:none;"}">
+        <label class="action-btn" style="width:auto;padding:6px 14px;font-size:12px;cursor:pointer;background:var(--card-light,#f1f5f9);color:var(--text,#333);">
+          <i class="fas fa-upload"></i> Choose Logo
+          <input id="cd-logo-file-input" type="file" accept="image/*" style="display:none;" onchange="window.handleCompanyDetailsLogoSelect(this.files[0])">
+        </label>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label for="cd-logo-size-factor" style="font-size:11px;color:var(--muted,#666);white-space:nowrap;">Size ×</label>
+          <input id="cd-logo-size-factor" type="number" min="0.1" max="3.0" step="0.1" value="${escapeAttr(String(logoSizeFactorValue))}" style="width:64px;padding:6px;border-radius:6px;border:1.5px solid var(--border,#ccc);font-size:12px;">
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--muted,#666);margin:4px 0 0 0;">Scales the logo up or down on every printed document. 1.0 is the original size.</p>
+    </div>
+    ${fieldsHtml}
+    <div id="company-details-error" style="color:#b91c1c;font-size:12px;display:none;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button type="button" id="company-details-cancel" style="flex:1;padding:10px;border-radius:8px;border:none;background:#f1f5f9;color:#334155;font-weight:600;cursor:pointer;">Cancel</button>
+      <button type="button" id="company-details-save" style="flex:1;padding:10px;border-radius:8px;border:none;background:#111827;color:#fff;font-weight:700;cursor:pointer;">Save</button>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+
+  document.getElementById("company-details-cancel").onclick = () => overlay.remove();
+  document.getElementById("company-details-save").onclick = saveCompanyDetails;
+}
+window.openCompanyDetailsDialog = openCompanyDetailsDialog;
+
+async function handleCompanyDetailsLogoSelect(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    try {
+      const compressed = await compressImageToTargetLimit(ev.target.result, 190000);
+      companyDetailsLogoData = compressed;
+      const previewEl = document.getElementById("cd-logo-preview");
+      if (previewEl) {
+        previewEl.src = compressed;
+        previewEl.style.display = "inline-block";
+      }
+    } catch (err) {
+      alert("⚠️ " + (err.message || "Failed to process image."));
+    }
+  };
+  reader.readAsDataURL(file);
+}
+window.handleCompanyDetailsLogoSelect = handleCompanyDetailsLogoSelect;
+
+async function saveCompanyDetails() {
+  const saveBtn = document.getElementById("company-details-save");
+  const errorEl = document.getElementById("company-details-error");
+  errorEl.style.display = "none";
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving...";
+
+  const logoSizeFactorInput = Number(document.getElementById("cd-logo-size-factor").value);
+  const fieldsToSave = [
+    ["Logo", companyDetailsLogoData],
+    ["LogoSizeFactor", logoSizeFactorInput > 0 ? logoSizeFactorInput : 1.0],
+    ["CompanyName", document.getElementById("cd-name").value.trim()],
+    ["CompanySlogan", document.getElementById("cd-slogan").value.trim()],
+    ["CompanyAddress", document.getElementById("cd-address").value.trim()],
+    ["CompanyPhone1", document.getElementById("cd-phone1").value.trim()],
+    ["CompanyPhone2", document.getElementById("cd-phone2").value.trim()],
+    ["CompanyEmail", document.getElementById("cd-email").value.trim()],
+    ["CompanyTIN", document.getElementById("cd-tin").value.trim()],
+    ["CompanyVatNumber", document.getElementById("cd-vat-number").value.trim()],
+    ["CompanyRegistrationNumber", document.getElementById("cd-reg-number").value.trim()],
+  ];
+
+  try {
+    // Sequential, not Promise.all -- these all write to the same
+    // company_settings row; firing them concurrently risks a lost
+    // update if two requests race on the same row (last-write-wins
+    // per-column is fine, but there's no reason to risk it for what's
+    // a one-time save, not a hot path).
+    for (const [key, value] of fieldsToSave) {
+      await callApi("updateSetting", { key, value });
+    }
+    const cache = getCache();
+    if (!cache.settings) cache.settings = {};
+    if (!cache.settings.data) cache.settings.data = {};
+    for (const [key, value] of fieldsToSave) cache.settings.data[key] = value;
+    setCache(cache);
+    if (typeof writeBackup === "function") writeBackup("getSettings", cache.settings, {});
+
+    document.getElementById("company-details-dialog").remove();
+    if (typeof showSyncToast === "function") showSyncToast("✅ Company details saved");
+  } catch (e) {
+    errorEl.textContent = e.message || "Failed to save company details";
+    errorEl.style.display = "block";
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save";
+  }
+}
+window.saveCompanyDetails = saveCompanyDetails;
