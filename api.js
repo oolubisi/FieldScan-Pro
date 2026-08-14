@@ -487,6 +487,14 @@ async function checkAuthOnStartup() {
   try {
     const token = await getSessionToken();
     setSignInMenuState(!!token);
+    // Runs on every launch AND right after a successful sign-in (login()
+    // reloads the page, which re-runs this from scratch) -- so this is
+    // the one place that naturally covers both "app just launched with
+    // pending queue items from a previous offline session" and "just
+    // signed in, flush anything that got queued while unauthenticated."
+    if (token && navigator.onLine) {
+      syncQueuedRequests().catch((e) => console.error("Startup auto-sync failed, items remain queued for retry:", e));
+    }
   } catch (e) {
     setSignInMenuState(false);
   }
@@ -495,6 +503,44 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", checkAuthOnStartup);
 } else {
   checkAuthOnStartup();
+}
+
+/**
+ * Shared by both failure modes that should queue a write for later
+ * rather than lose it: a genuine network failure (fetch() itself
+ * throws), and a 401 (no valid session at all) on a write action.
+ * These are DIFFERENT problems -- one is connectivity, the other is
+ * authentication -- but the user experience should be identical either
+ * way: the save happens locally right away, exactly as if it had
+ * succeeded, and the actual server write is retried automatically once
+ * whatever was blocking it (connectivity, or someone signing back in)
+ * is resolved. A write that's destined to keep failing with the exact
+ * same 401 until a human re-authenticates isn't a reason to lose the
+ * data someone just typed -- it's exactly the kind of thing offline
+ * queueing already exists to protect against.
+ */
+async function queueWriteLocally(action, cleanData, reason) {
+  await queueOfflineRequest(action, cleanData);
+  const tempIdInfo = applyLocalMutation(action, cleanData);
+  updateSyncStatus();
+  showSyncToast(
+    reason === "auth"
+      ? "🔒 Not signed in: saved locally. Will sync once you sign in."
+      : "📴 Offline: saved locally. Will sync when back online.",
+  );
+  // success:true (not just status:"queued") so the many existing call
+  // sites across the app that check `if (!resp.success)` keep working
+  // unchanged instead of misreporting a successful queue as a failure.
+  // When this was a brand-new item (not an update/delete), the temp id
+  // from applyLocalMutation is echoed back under its real field name
+  // (e.g. estimateId, taskId) so the calling code can keep going --
+  // opening or referencing the new item -- exactly as if the save had
+  // returned from the server normally.
+  return {
+    success: true,
+    status: "queued",
+    ...(tempIdInfo ? { [tempIdInfo.idKey]: tempIdInfo.idVal } : {}),
+  };
 }
 
 async function apiRequestHeaders() {
@@ -536,25 +582,7 @@ async function callApi(action, data = {}) {
         action === "getStats" ? { activeVendors: "--" } : action === "getProjectFullExportData" ? { success: false, error: "offline-fallback", data: null } : [],
         cleanData,
       );
-    await queueOfflineRequest(action, cleanData);
-    const tempIdInfo = applyLocalMutation(action, cleanData);
-    updateSyncStatus();
-    showSyncToast("📴 Offline: saved locally. Will sync when back online.");
-    // success:true (not just status:"queued") so the many existing call
-    // sites across the app that check `if (!resp.success)` keep working
-    // unchanged instead of misreporting a successful offline queue as a
-    // failure -- that mismatch was a real, separate bug found while
-    // making creation flows work offline. When this was a brand-new
-    // item (not an update/delete), the temp id from applyLocalMutation
-    // is echoed back under its real field name (e.g. estimateId,
-    // taskId) so the calling code can keep going -- opening or
-    // referencing the new item -- exactly as if the save had returned
-    // from the server normally.
-    return {
-      success: true,
-      status: "queued",
-      ...(tempIdInfo ? { [tempIdInfo.idKey]: tempIdInfo.idVal } : {}),
-    };
+    return queueWriteLocally(action, cleanData, "offline");
   } finally {
     clearTimeout(timeoutId);
   }
@@ -567,6 +595,7 @@ async function callApi(action, data = {}) {
         action === "getStats" ? { activeVendors: "--" } : action === "getProjectFullExportData" ? { success: false, error: "offline-fallback", data: null } : [],
         cleanData,
       );
+    if (response.status === 401) return queueWriteLocally(action, cleanData, "auth");
     throw new Error(`HTTP ${response.status}`);
   }
 
@@ -676,6 +705,13 @@ async function callApi(action, data = {}) {
 }
 
 const DEPENDENCY_ORDER = {
+  // Foundational -- other things reference these by id, so they need
+  // to sync (and get their real server-assigned id) before anything
+  // that depends on them is attempted.
+  saveClient: 0,
+  updateClient: 0,
+  saveEstimate: 0.5,
+  updateEstimate: 0.5,
   saveProject: 1,
   updateProject: 1,
   saveVendor: 2,
@@ -711,6 +747,48 @@ async function runInBackground(action, data) {
 }
 window.runInBackground = runInBackground;
 
+/**
+ * Propagates a newly-assigned real server id to every OTHER item still
+ * sitting in the offline queue that referenced the old temp id --
+ * generically, via a stringify/replace/parse round-trip rather than
+ * needing an exhaustive map of which field name means "client id" in
+ * every possible action's payload. Persists each changed item back to
+ * IndexedDB immediately (not just the in-memory copy), so the fix
+ * survives even if the app closes partway through a sync.
+ */
+async function reconcileQueuedIdReferences(queue, justCompletedItemId, oldIdVal, newIdVal) {
+  for (const item of queue) {
+    if (item.id === justCompletedItemId) continue;
+    const before = JSON.stringify(item.data);
+    if (!before.includes(oldIdVal)) continue;
+    const after = before.split(oldIdVal).join(newIdVal);
+    item.data = JSON.parse(after);
+    try {
+      await updateQueuedRequest(item.id, { data: item.data });
+    } catch (e) {
+      console.error("Failed to persist id reconciliation for queued item", item.id, e);
+    }
+  }
+}
+
+/**
+ * Same idea, applied to the local cached/backup copies of every store
+ * (not the queue itself) -- so anything already rendered on screen
+ * referencing the old temp id (e.g. an estimate's client reference)
+ * shows the correct final id too, not just what eventually gets sent
+ * to the server.
+ */
+function reconcileLocalCacheIdReferences(oldIdVal, newIdVal) {
+  for (const getAction of Object.values(GET_ACTION_BY_STORE)) {
+    const current = readBackup(getAction, null);
+    if (!current) continue;
+    const before = JSON.stringify(current);
+    if (!before.includes(oldIdVal)) continue;
+    const after = before.split(oldIdVal).join(newIdVal);
+    writeBackup(getAction, JSON.parse(after));
+  }
+}
+
 async function syncQueuedRequests() {
   await updateSyncStatus();
   let queue = await getQueuedRequests();
@@ -740,6 +818,26 @@ async function syncQueuedRequests() {
             result.success !== false &&
             result.status !== "error"
           ) {
+            // If this was a brand-new item created while offline/
+            // unauthenticated (see applyLocalMutation's temp id), the
+            // server has now assigned its real id. Any OTHER still-
+            // queued item that referenced the old temp id (e.g. an
+            // estimate's clientId pointing at a client that hadn't
+            // synced yet) needs that reference updated to the real id
+            // -- otherwise it goes on to fail every single retry with
+            // the exact same "references a client/project/etc that
+            // doesn't exist" error, since retrying with the same
+            // stale temp id can never succeed no matter how many times
+            // it's attempted.
+            const cfg = typeof MUTATION_MAP !== "undefined" ? MUTATION_MAP[item.action] : null;
+            if (cfg && cfg.mode === "upsert") {
+              const oldIdVal = String(item.data[cfg.idKey] || "");
+              const newIdVal = result[cfg.idKey];
+              if (oldIdVal.startsWith("temp_") && newIdVal && oldIdVal !== String(newIdVal)) {
+                await reconcileQueuedIdReferences(queue, item.id, oldIdVal, String(newIdVal));
+                reconcileLocalCacheIdReferences(oldIdVal, String(newIdVal));
+              }
+            }
             await deleteQueuedRequest(item.id);
             success = true;
             break;

@@ -247,7 +247,17 @@ if ("serviceWorker" in navigator && !isElectronApp) {
       .catch((e) => console.warn(e)),
   );
 }
-window.addEventListener("online", updateSyncStatus);
+window.addEventListener("online", () => {
+  updateSyncStatus();
+  // Only meaningful if actually signed in -- if not, there's a valid
+  // reason nothing's queued yet to retry (see checkAuthOnStartup in
+  // api.js, which also covers the "just signed in" case on its own).
+  if (typeof getSessionToken === "function") {
+    getSessionToken().then((token) => {
+      if (token) syncQueuedRequests().catch((e) => console.error("Reconnect auto-sync failed, items remain queued for retry:", e));
+    });
+  }
+});
 window.addEventListener("offline", updateSyncStatus);
 
 // ===== PWA INSTALL =====

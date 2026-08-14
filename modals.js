@@ -7,6 +7,16 @@ function resetSubmitOnError(submit) {
   return (err) => {
     submit.disabled = false;
     submit.innerText = "Save";
+    // This used to reset the button and stop there -- silently, with
+    // no indication anything went wrong at all. Affects every modal
+    // that shares this same helper: Project, Vendor, Work Order, Snag,
+    // Payment.
+    const message = String((err && err.message) || err || "");
+    if (message.includes("401")) {
+      alert("You're not signed in. Please sign in and try again.");
+    } else {
+      alert("Failed to save: " + (message || "Unknown error"));
+    }
   };
 }
 
