@@ -56,7 +56,7 @@ async function queueOfflineRequest(action, data) {
   const dataWithMutationId = { ...data, mutationId };
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
-    tx.objectStore(STORE_NAME).add({
+    const addRequest = tx.objectStore(STORE_NAME).add({
       action,
       data: dataWithMutationId,
       // Which account was active when this was queued -- lets the
@@ -70,7 +70,9 @@ async function queueOfflineRequest(action, data) {
       lastError: "",
       lastAttempt: "",
     });
-    tx.oncomplete = () => resolve();
+    let newId;
+    addRequest.onsuccess = () => { newId = addRequest.result; };
+    tx.oncomplete = () => resolve({ id: newId, mutationId });
     tx.onerror = () => reject(tx.error);
   });
 }

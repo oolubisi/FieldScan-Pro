@@ -761,8 +761,34 @@ if (document.readyState === "loading") {
  * queueing already exists to protect against.
  */
 async function queueWriteLocally(action, cleanData, reason) {
-  await queueOfflineRequest(action, cleanData);
+  const { id: queuedItemId, mutationId } = await queueOfflineRequest(action, cleanData);
   const tempIdInfo = applyLocalMutation(action, cleanData);
+  // A brand-new item's own queued request never carries its own future
+  // id (the server assigns it) -- only OTHER items that reference it
+  // do. Without writing the generated temp id back into THIS item's own
+  // persisted payload too, reconciliation has nothing to find in the
+  // succeeding request's own data when it's this item's turn to sync,
+  // so any OTHER queued item referencing the same temp id (e.g. an
+  // updateEstimate or createProjectFromEstimate for an estimate that
+  // was just created) never gets corrected -- exactly the remaining
+  // bug behind "invalid input syntax for type uuid" on a downstream
+  // action, even after the create itself succeeds. Harmless to the
+  // server either way: the backend's insert never reads this field
+  // from a create payload, it only ever returns the real one.
+  //
+  // Critically: this preserves the SAME mutationId queueOfflineRequest
+  // already generated and stored -- not a fresh/missing one -- since
+  // that's what the idempotent-replay guard keys on; silently losing it
+  // here would have broken that entirely.
+  if (tempIdInfo && queuedItemId != null) {
+    try {
+      await updateQueuedRequest(queuedItemId, {
+        data: { ...cleanData, mutationId, [tempIdInfo.idKey]: tempIdInfo.idVal },
+      });
+    } catch (e) {
+      console.error("Failed to write temp id back into queued request", e);
+    }
+  }
   updateSyncStatus();
   showSyncToast(
     reason === "auth"

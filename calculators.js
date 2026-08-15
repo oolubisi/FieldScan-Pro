@@ -285,12 +285,25 @@ function addConcreteElement() {
   if (!container) return;
   const id = `concreteel${Date.now()}${Math.floor(Math.random() * 1000)}`;
   const body = `
-    <label style="display:block; font-weight:800; margin-bottom:4px;">Length (m)</label>
-    <input type="number" class="ce-l" step="0.01" min="0" placeholder="e.g. 3.0">
-    <label style="display:block; font-weight:800; margin: 10px 0 4px;">Width (m)</label>
-    <input type="number" class="ce-w" step="0.01" min="0" placeholder="e.g. 2.0">
-    <label style="display:block; font-weight:800; margin: 10px 0 4px;">Height / Thickness (m)</label>
-    <input type="number" class="ce-h" step="0.01" min="0" placeholder="e.g. 0.15">
+    <label style="display:block; font-weight:800; margin-bottom:4px;">Shape</label>
+    <select class="ce-shape" onchange="window.toggleConcreteShape('${id}')">
+      <option value="rectangular" selected>Rectangular / Slab</option>
+      <option value="cylindrical">Cylindrical (round column)</option>
+    </select>
+    <div class="ce-rect-fields">
+      <label style="display:block; font-weight:800; margin: 10px 0 4px;">Length (m)</label>
+      <input type="number" class="ce-l" step="0.01" min="0" placeholder="e.g. 3.0">
+      <label style="display:block; font-weight:800; margin: 10px 0 4px;">Width (m)</label>
+      <input type="number" class="ce-w" step="0.01" min="0" placeholder="e.g. 2.0">
+      <label style="display:block; font-weight:800; margin: 10px 0 4px;">Height / Thickness (mm)</label>
+      <input type="number" class="ce-h-rect" step="1" min="0" placeholder="e.g. 150">
+    </div>
+    <div class="ce-cyl-fields" style="display:none;">
+      <label style="display:block; font-weight:800; margin: 10px 0 4px;">Diameter (mm)</label>
+      <input type="number" class="ce-dia" step="1" min="0" placeholder="e.g. 450">
+      <label style="display:block; font-weight:800; margin: 10px 0 4px;">Height (m)</label>
+      <input type="number" class="ce-h-cyl" step="0.01" min="0" placeholder="e.g. 3.0">
+    </div>
     <label style="display:block; font-weight:800; margin: 10px 0 4px;">Concrete Mix Ratio</label>
     <select class="ce-mix">
       <option value="1:1.5:3">1 : 1.5 : 3 (high strength — columns/beams)</option>
@@ -317,6 +330,15 @@ function addConcreteElement() {
 }
 window.addConcreteElement = addConcreteElement;
 
+function toggleConcreteShape(id) {
+  const row = document.querySelector(`.calc-card-row[data-card-id="${id}"]`);
+  if (!row) return;
+  const isCylindrical = row.querySelector(".ce-shape").value === "cylindrical";
+  row.querySelector(".ce-rect-fields").style.display = isCylindrical ? "none" : "block";
+  row.querySelector(".ce-cyl-fields").style.display = isCylindrical ? "block" : "none";
+}
+window.toggleConcreteShape = toggleConcreteShape;
+
 function calculateConcrete() {
   const rows = document.querySelectorAll("#concrete-elements-container .calc-card-row");
   if (!rows.length) {
@@ -338,10 +360,36 @@ function calculateConcrete() {
   rows.forEach((row, idx) => {
     const name = row.querySelector(".calc-card-name").value.trim() || `Element ${idx + 1}`;
     const qty = Math.max(1, Number(row.querySelector(".ce-qty").value) || 1);
-    const L = Number(row.querySelector(".ce-l").value) || 0;
-    const W = Number(row.querySelector(".ce-w").value) || 0;
-    const H = Number(row.querySelector(".ce-h").value) || 0;
-    if (L <= 0 || W <= 0 || H <= 0) return;
+    const shape = row.querySelector(".ce-shape").value;
+
+    let wetVolume, dimensionLabel, formworkAreaBase, H;
+    if (shape === "cylindrical") {
+      const D_mm = Number(row.querySelector(".ce-dia").value) || 0;
+      const D = D_mm / 1000;
+      // Column height is naturally expressed in metres on site (e.g.
+      // "3m column"), unlike a slab's thickness -- entered directly in
+      // metres here, no conversion needed.
+      H = Number(row.querySelector(".ce-h-cyl").value) || 0;
+      if (D <= 0 || H <= 0) return;
+      const radius = D / 2;
+      wetVolume = Math.PI * radius * radius * H;
+      // Lateral (curved side) area only, same convention as the
+      // rectangular case below -- top/bottom aren't formed, just cast
+      // against the ground or previous pour.
+      formworkAreaBase = Math.PI * D * H;
+      dimensionLabel = `Ø${fmtNum(D_mm, 0)}mm x ${fmtNum(H)}m`;
+    } else {
+      const L = Number(row.querySelector(".ce-l").value) || 0;
+      const W = Number(row.querySelector(".ce-w").value) || 0;
+      // Thickness is entered in mm (matches how it's actually specified
+      // on site -- e.g. "150mm slab") but every formula below is
+      // unit-consistent in metres, so convert once here.
+      H = (Number(row.querySelector(".ce-h-rect").value) || 0) / 1000;
+      if (L <= 0 || W <= 0 || H <= 0) return;
+      wetVolume = L * W * H;
+      formworkAreaBase = 2 * (L + W) * H;
+      dimensionLabel = `${fmtNum(L)}x${fmtNum(W)}m x ${fmtNum(H * 1000, 0)}mm`;
+    }
     anyEntered = true;
 
     const mix = row.querySelector(".ce-mix").value;
@@ -349,7 +397,6 @@ function calculateConcrete() {
     const parts = mix.split(":").map(Number);
     const sumParts = parts[0] + parts[1] + parts[2];
 
-    const wetVolume = L * W * H;
     const dryVolume = wetVolume * c.concrete.dryVolumeFactor;
     const cementVolume = (dryVolume * parts[0]) / sumParts;
     const sandVolume = (dryVolume * parts[1]) / sumParts;
@@ -363,7 +410,7 @@ function calculateConcrete() {
     let rebarKg = 0;
     if (rebarChoice === "single") rebarKg = wetVolume * c.concrete.rebarKgPerM3Single;
     if (rebarChoice === "double") rebarKg = wetVolume * c.concrete.rebarKgPerM3Double;
-    let formworkArea = 2 * (L + W) * H * c.concrete.formworkFactor;
+    let formworkArea = formworkAreaBase * c.concrete.formworkFactor;
     let bindingWireKg = (rebarKg / 1000) * c.concrete.bindingWireKgPerTonRebar;
     let nailsKg = formworkArea * c.concrete.nailsKgPerM2Formwork;
 
@@ -386,12 +433,12 @@ function calculateConcrete() {
 
     const rebarLabel = rebarChoice === "none" ? "none" : rebarChoice;
     elementLines.push(
-      `  ${name}${qty > 1 ? ` (×${qty})` : ""}: ${fmtNum(L)}x${fmtNum(W)}x${fmtNum(H)}m, mix ${mix}, rebar ${rebarLabel} → ${fmtNum(Math.ceil(cementBags), 0)} bags, ${fmtNum(sandTons, 2)}t sand, ${fmtNum(aggregateTons, 2)}t granite${rebarChoice !== "none" ? `, ${fmtNum(rebarKg, 1)}kg rebar` : ""}`,
+      `  ${name}${qty > 1 ? ` (×${qty})` : ""}: ${dimensionLabel}, mix ${mix}, rebar ${rebarLabel} → ${fmtNum(Math.ceil(cementBags), 0)} bags, ${fmtNum(sandTons, 2)}t sand, ${fmtNum(aggregateTons, 2)}t granite${rebarChoice !== "none" ? `, ${fmtNum(rebarKg, 1)}kg rebar` : ""}`,
     );
   });
 
   if (!anyEntered) {
-    alert("Enter Length, Width and Height (all > 0) for at least one element");
+    alert("Enter dimensions (Length+Width, or Diameter for cylindrical) and Height (all > 0) for at least one element");
     return;
   }
 
