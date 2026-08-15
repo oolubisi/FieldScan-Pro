@@ -47,37 +47,103 @@ function ensureDir(dir) {
 // The session token is a bearer credential (same sensitivity as the old
 // Google refresh token), so it's encrypted at rest via Electron's
 // OS-keychain-backed safeStorage, same pattern as before -- just a lot
-// less code, since there's no exchange/refresh dance anymore. The token
-// itself is valid for 30 days (see the backend's SESSION_TTL_SECONDS);
-// there's no silent-refresh path needed, the user just signs in again
-// after it expires (or on every launch, per clearStoredToken() below).
+// less code, since there's no exchange/refresh dance anymore. Each
+// token is valid for 30 days (see the backend's SESSION_TTL_SECONDS).
+// Multiple accounts can be cached at once on the same device (see
+// loadAllAccounts below), enabling instant offline switching between
+// them; explicit sign-out or an inactivity timeout removes just that
+// one account, not the whole cache.
 //
 // The actual login HTTP request happens in the RENDERER (api.js), not
 // here -- config.js's GAS_URL and fetch/localStorage are browser-only,
 // not available in the main process without duplicating config.js's
 // logic. main.js's only job is securely storing whatever token the
 // renderer already obtained.
-function tokenPath() {
-  return path.join(app.getPath("userData"), "session_token.enc");
+function accountsPath() {
+  return path.join(app.getPath("userData"), "accounts.enc");
 }
-function saveToken(token) {
+
+/**
+ * All accounts ever successfully signed into on this device, each with
+ * its own token -- not just "the current one." This is what makes
+ * offline account switching possible: switching to a company you've
+ * used before on this machine doesn't need a live login, it just
+ * swaps which cached token gets used, no network required. Whether an
+ * account STAYS in this list after signing out of it is deliberately
+ * different between a normal switch-away (stays, for fast switching
+ * back) and an explicit sign-out or inactivity timeout (removed --
+ * see removeAccount below), matching the security intent of each.
+ *
+ * Stored as one encrypted JSON blob (not one file per account) --
+ * simpler to reason about, and the number of accounts on one device
+ * is always small.
+ */
+function loadAllAccounts() {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return [];
+    const encrypted = fs.readFileSync(accountsPath());
+    const decrypted = safeStorage.decryptString(encrypted);
+    const parsed = JSON.parse(decrypted);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return []; // no accounts saved yet, or couldn't decrypt/parse
+  }
+}
+
+function saveAllAccounts(accounts) {
   if (!safeStorage.isEncryptionAvailable()) {
-    console.warn("safeStorage encryption unavailable on this OS -- session not persisted; user will need to sign in again next launch.");
+    console.warn("safeStorage encryption unavailable on this OS -- accounts not persisted; sign-in will be needed again next launch.");
     return;
   }
-  fs.writeFileSync(tokenPath(), safeStorage.encryptString(token));
+  fs.writeFileSync(accountsPath(), safeStorage.encryptString(JSON.stringify(accounts)));
 }
-function loadToken() {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) return null;
-    const encrypted = fs.readFileSync(tokenPath());
-    return safeStorage.decryptString(encrypted);
-  } catch (e) {
-    return null; // no token saved yet, or couldn't decrypt (e.g. moved to a different machine)
-  }
+
+function saveAccountToken(email, token) {
+  email = String(email).toLowerCase().trim();
+  const accounts = loadAllAccounts();
+  const idx = accounts.findIndex((a) => String(a.email).toLowerCase().trim() === email);
+  const entry = { email, token, lastUsedAt: Date.now() };
+  if (idx === -1) accounts.push(entry);
+  else accounts[idx] = entry;
+  saveAllAccounts(accounts);
 }
-function clearStoredToken() {
-  try { fs.unlinkSync(tokenPath()); } catch (e) {}
+
+function getAccountToken(email) {
+  email = String(email).toLowerCase().trim();
+  const accounts = loadAllAccounts();
+  const found = accounts.find((a) => String(a.email).toLowerCase().trim() === email);
+  return found ? found.token : null;
+}
+
+// Listing only -- deliberately never sends raw tokens to the renderer
+// for this one; the renderer only needs to know WHICH accounts are
+// available to switch to; it asks for a specific token separately
+// (getAccountToken) only when it's actually about to use one.
+function listAccounts() {
+  return loadAllAccounts()
+    .map((a) => ({ email: a.email, lastUsedAt: a.lastUsedAt }))
+    .sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+}
+
+// Used by both an explicit "Sign Out" click and an inactivity timeout
+// -- both are deliberate "I'm done here, prove it again next time"
+// actions, unlike a normal switch-away (which keeps the account cached
+// for fast switching back).
+function removeAccount(email) {
+  email = String(email).toLowerCase().trim();
+  const accounts = loadAllAccounts().filter((a) => String(a.email).toLowerCase().trim() !== email);
+  saveAllAccounts(accounts);
+}
+
+// Explicit choice, after being warned this removes offline switching
+// across a full app close+reopen: every account's cached token is wiped
+// on every genuine app launch, not just an explicit sign-out. Switching
+// between multiple companies signed into DURING the same continuous
+// session still works instantly -- this only resets at the START of a
+// fresh launch, same principle as the original single-account design,
+// just now applied per-account instead of to one global token.
+function clearAllAccounts() {
+  saveAllAccounts([]);
 }
 
 // Guard against a compromised renderer asking us to open/delete an
@@ -394,12 +460,15 @@ async function shareEmailWithAttachment(filePaths, fileNames) {
 }
 
 app.whenReady().then(() => {
-  // By design: sign-in is required every time the app is launched, not
-  // silently reused across restarts via the saved session token. Clearing
-  // it here (rather than never saving one at all) still lets a single
-  // running session stay signed in without re-prompting mid-use -- it
-  // only resets at the START of each new launch.
-  clearStoredToken();
+  // Explicit, deliberate choice: every account's cached token is wiped
+  // on every genuine app launch (not renderer-level reloads triggered
+  // by our own switchToAccount()/login() -- app.whenReady() only fires
+  // once per real launch, unaffected by those). A password is required
+  // again for every company on every fresh open, even one used minutes
+  // before closing. Switching between multiple companies signed into
+  // DURING the same continuous session still works instantly -- this
+  // only resets at the START of a new launch.
+  clearAllAccounts();
 
   buildMenu();
 
@@ -630,19 +699,24 @@ app.whenReady().then(() => {
     shell.openPath(dir);
   });
 
-  // ---- Session token storage (the actual login HTTP request happens
-  // in the renderer via api.js -- these three handlers only ever touch
-  // the encrypted-at-rest token file) ----
-  ipcMain.handle("auth:saveToken", (event, token) => {
-    saveToken(token);
+  // ---- Multi-account session token storage (email + password auth) ----
+  // The actual login HTTP request happens in the renderer (api.js) --
+  // these handlers only ever persist/retrieve/list/remove tokens via
+  // main.js's OS-keychain-backed safeStorage, one entry per account
+  // ever signed into on this device.
+  ipcMain.handle("auth:saveAccountToken", (event, email, token) => {
+    saveAccountToken(email, token);
     return { success: true };
   });
-  ipcMain.handle("auth:getToken", () => {
-    const token = loadToken();
+  ipcMain.handle("auth:getAccountToken", (event, email) => {
+    const token = getAccountToken(email);
     return { success: true, token };
   });
-  ipcMain.handle("auth:signOut", () => {
-    clearStoredToken();
+  ipcMain.handle("auth:listAccounts", () => {
+    return { success: true, accounts: listAccounts() };
+  });
+  ipcMain.handle("auth:removeAccount", (event, email) => {
+    removeAccount(email);
     return { success: true };
   });
 

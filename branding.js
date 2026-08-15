@@ -55,6 +55,23 @@ function _getCompanyDetails() {
   };
 }
 
+/**
+ * Shows the current company's name in the sidebar/mobile header,
+ * instead of a static "FieldScan Pro" -- especially useful now that
+ * signing into different companies on the same device is possible,
+ * this doubles as a visible confirmation of which one you're
+ * currently in. Falls back to the original branding text if the
+ * company hasn't set a name yet, rather than an odd bracketed
+ * placeholder sitting permanently in the main navigation.
+ */
+function applyCompanyNameToSidebar() {
+  const el = document.getElementById("sidebar-company-name");
+  if (!el) return;
+  const c = _getCompanyDetails();
+  el.textContent = c.name || "FieldScan Pro";
+}
+window.applyCompanyNameToSidebar = applyCompanyNameToSidebar;
+
 async function _getLogoUrl() {
   const settings = _getSettings();
   const data = settings && settings.data ? settings.data : settings;

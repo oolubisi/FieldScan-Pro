@@ -59,6 +59,12 @@ async function queueOfflineRequest(action, data) {
     tx.objectStore(STORE_NAME).add({
       action,
       data: dataWithMutationId,
+      // Which account was active when this was queued -- lets the
+      // sync/badge/panel logic scope everything to "only what belongs
+      // to whoever's currently signed in," so switching to a different
+      // company never shows, counts, auto-syncs, or bulk-clears another
+      // company's pending items.
+      accountEmail: (localStorage.getItem("fieldscan_user_email") || "").toLowerCase().trim(),
       timestamp: Date.now(),
       retryCount: 0,
       lastError: "",
@@ -79,6 +85,37 @@ async function getQueuedRequests() {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+}
+
+/**
+ * Scoped to whichever account is CURRENTLY signed in -- this is what
+ * the pending-count badge, the Sync Queue panel, "Clear All", and
+ * auto-sync should all use instead of the raw getQueuedRequests()
+ * above. Older items queued before this tagging existed have no
+ * accountEmail at all; they're treated as belonging to whoever's
+ * currently active rather than becoming permanently invisible/orphaned.
+ */
+async function getQueuedRequestsForCurrentAccount() {
+  const all = await getQueuedRequests();
+  const currentEmail = (localStorage.getItem("fieldscan_user_email") || "").toLowerCase().trim();
+  return all.filter((item) => !item.accountEmail || item.accountEmail === currentEmail);
+}
+
+/**
+ * Counts (not the full items, just numbers) for every OTHER account
+ * that has pending items -- used for the light "Company A has 2 items
+ * waiting" heads-up when switching, without exposing anything about
+ * those items beyond a count.
+ */
+async function getPendingCountsByOtherAccounts() {
+  const all = await getQueuedRequests();
+  const currentEmail = (localStorage.getItem("fieldscan_user_email") || "").toLowerCase().trim();
+  const counts = {};
+  for (const item of all) {
+    if (!item.accountEmail || item.accountEmail === currentEmail) continue;
+    counts[item.accountEmail] = (counts[item.accountEmail] || 0) + 1;
+  }
+  return counts;
 }
 
 async function deleteQueuedRequest(id) {

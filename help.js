@@ -38,9 +38,22 @@ function helpAboutSectionHtml() {
 
     '<h4 style="font-size:13px; margin:14px 0 6px;">Team & Vendor Management</h4>' +
     '<ul style="font-size:13px; color:var(--muted); line-height:1.6; margin:0 0 4px 18px; padding:0;">' +
-    '<li>Vendors and Clients are never truly deleted — they\'re archived instead, fully recoverable with their history intact.</li>' +
+    '<li>Vendors, Clients, and Projects are never truly deleted — they\'re archived instead, fully recoverable with their history intact.</li>' +
     '<li>Work Orders assign scoped work to vendors, tracked from Draft through Approved.</li>' +
     '<li>Bulk actions where they matter: approve multiple Work Orders, export multiple Payments at once.</li>' +
+    '</ul>' +
+
+    '<h4 style="font-size:13px; margin:14px 0 6px;">Sign In & Multiple Companies</h4>' +
+    '<ul style="font-size:13px; color:var(--muted); line-height:1.6; margin:0 0 4px 18px; padding:0;">' +
+    '<li>Sign in with your email and password — the same account works on both desktop and mobile.</li>' +
+    '<li>You can be signed into more than one company on the same device, and switch between them instantly, even with no signal, once you\'ve signed into each at least once.</li>' +
+    '<li>Signs you out automatically after 15 minutes of inactivity, with a warning first — nothing you\'re actively working on offline ever gets interrupted by this.</li>' +
+    '</ul>' +
+
+    '<h4 style="font-size:13px; margin:14px 0 6px;">Company Branding</h4>' +
+    '<ul style="font-size:13px; color:var(--muted); line-height:1.6; margin:0 0 4px 18px; padding:0;">' +
+    '<li>Settings → Company Details: your logo, name, address, phone, email, and tax/registration details, shown on every document you generate.</li>' +
+    '<li>The logo\'s size on printed documents is independently adjustable — scale it up or down without touching the original image.</li>' +
     '</ul>' +
 
     '<h4 style="font-size:13px; margin:14px 0 6px;">Tasks, Documents & Reporting</h4>' +
@@ -178,7 +191,7 @@ const HELP_SECTIONS = [
     ],
   },
   {
-    title: "Client & Vendor Archive",
+    title: "Client, Vendor & Project Archive",
     icon: "fa-user-slash",
     items: [
       {
@@ -188,6 +201,10 @@ const HELP_SECTIONS = [
       {
         q: "Where did an archived client or vendor go?",
         a: 'They drop out of the main list and collapse into an "Archived" section at the bottom, closed by default. Click it to expand and find them.',
+      },
+      {
+        q: "Can I archive a project too?",
+        a: 'Yes — this is different from Project Trash (deleting). Archiving a project is purely a declutter tool: it stays fully active and editable everywhere, it just tucks into a collapsed "Archived" section on your dashboard so your active project list stays focused. Use "Archive Project" / "Unarchive Project" from the project\'s Profile tab.',
       },
     ],
   },
@@ -206,6 +223,46 @@ const HELP_SECTIONS = [
       {
         q: "Does renaming a vendor break their payment history?",
         a: 'No — payment totals and grouping stay intact regardless of a rename. Settings → "Payment ↔ Vendor Links" can link older payments to their vendor by ID (not just by name), which keeps vendor-specific reports accurate even after a rename. It only works for vendors that haven\'t already been renamed before you run it.',
+      },
+    ],
+  },
+  {
+    title: "Sign In & Switching Companies",
+    icon: "fa-right-to-bracket",
+    items: [
+      {
+        q: "How do I sign in?",
+        a: 'Tap "Sign In" in the sidebar (desktop) or the More menu (mobile), enter your email and password. Your email is remembered for next time — you\'ll only need to type your password again on this device.',
+      },
+      {
+        q: "How do I sign out?",
+        a: 'Tap the green "Signed In" indicator and confirm. Unlike switching to another company, signing out fully forgets this account on this device — you\'ll need your password again to sign back in.',
+      },
+      {
+        q: "Can I work with more than one company on the same device?",
+        a: 'Yes. Once you\'ve signed into a second company at least once, tapping "Sign In" shows a list of every company you\'ve used on this device — tap one to switch instantly, no password needed, even with no signal at all. A company you\'ve never used on this device still needs a real sign-in the first time.',
+      },
+      {
+        q: "If I switch companies, does anything from the first one carry over?",
+        a: 'No — switching always clears what\'s currently displayed on screen before loading the other company\'s data, so nothing from one company is ever visible while you\'re working in another. Anything you created offline and haven\'t synced yet stays safely queued under its own company and picks up again the moment you switch back to it.',
+      },
+      {
+        q: "Why did I get signed out automatically?",
+        a: "After 15 minutes with no activity, you'll see a warning with a chance to stay signed in before it happens. This only protects against an unattended, forgotten-open device — it never interrupts something you're actively doing, online or off.",
+      },
+    ],
+  },
+  {
+    title: "Company Branding & Documents",
+    icon: "fa-building",
+    items: [
+      {
+        q: "Where do I set up my company's logo and details?",
+        a: 'Settings → "Edit Company Details" — logo, company name, slogan, address, phone numbers, email, TIN, VAT registration number, and company registration number. Anything left blank shows as a placeholder label on documents until you fill it in, rather than showing someone else\'s details.',
+      },
+      {
+        q: "My logo looks too big or too small on printed documents — can I fix that without re-uploading it?",
+        a: 'Yes — the "Size ×" field right next to the logo upload in Company Details scales it up or down (in 0.1 steps) across every document that shows your logo, without needing a different image file.',
       },
     ],
   },

@@ -52,13 +52,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
 // these three just persist/retrieve/clear the resulting token via
 // main.js's OS-keychain-backed safeStorage.
 contextBridge.exposeInMainWorld("electronAuth", {
-  // Called by the renderer right after a successful POST to /api/login.
-  saveToken: (token) => ipcRenderer.invoke("auth:saveToken", token),
+  // Called by the renderer right after a successful POST to /api/login,
+  // and also right after a successful switch-to-cached-account (to
+  // refresh that account's lastUsedAt).
+  saveAccountToken: (email, token) => ipcRenderer.invoke("auth:saveAccountToken", email, token),
 
-  // Returns { success, token } -- token is null if there's no saved
-  // session, meaning the caller should show the sign-in form.
-  getToken: () => ipcRenderer.invoke("auth:getToken"),
+  // Returns { success, token } for one specific account -- token is
+  // null if that account was never signed into on this device, or was
+  // subsequently removed (sign-out / inactivity timeout).
+  getAccountToken: (email) => ipcRenderer.invoke("auth:getAccountToken", email),
 
-  // Clears the saved token (e.g. for a "Sign out" button).
-  signOut: () => ipcRenderer.invoke("auth:signOut"),
+  // Returns { success, accounts: [{email, lastUsedAt}, ...] } -- every
+  // account currently cached on this device, for the account-switcher
+  // list. Deliberately never includes raw tokens; those are fetched
+  // one at a time via getAccountToken only when actually switching.
+  listAccounts: () => ipcRenderer.invoke("auth:listAccounts"),
+
+  // Removes one specific account from the cache -- used by an explicit
+  // "Sign Out" click and by the inactivity auto-logout. Deliberately
+  // different from a normal switch-away, which leaves the account
+  // cached for fast switching back later.
+  removeAccount: (email) => ipcRenderer.invoke("auth:removeAccount", email),
 });

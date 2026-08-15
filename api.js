@@ -154,29 +154,107 @@ function buildRequestEnvelope(action, data) {
  * ID token. On desktop, this comes from main.js's OAuth loopback flow via
  * the preload bridge (window.electronAuth) when running in Electron, or
  * localStorage directly when running as a plain browser/PWA deployment
- * of this same frontend. Falls back to null (unauthenticated) if
- * there's no session yet -- callers should show the sign-in form in
- * that case (see openSignInDialog() below).
+ * of this same frontend -- multiple accounts can be cached at once on
+ * either platform, this always fetches the token for whichever account
+ * is CURRENTLY active (fieldscan_user_email). Falls back to null
+ * (unauthenticated) if there's no session yet -- callers should show
+ * the sign-in form in that case (see openSignInDialog() below).
  */
 async function getSessionToken() {
-  if (window.electronAuth && typeof window.electronAuth.getToken === "function") {
+  const email = localStorage.getItem("fieldscan_user_email");
+  if (!email) return null;
+  return getAccountTokenAnyPlatform(email);
+}
+
+/**
+ * The three platform-abstracted account-storage primitives, each
+ * branching on window.electronAuth vs. a parallel localStorage-based
+ * store for the browser/PWA case. Every other account-related function
+ * below builds on just these three, rather than each duplicating the
+ * Electron-vs-PWA branch itself.
+ */
+async function getAccountTokenAnyPlatform(email) {
+  email = String(email).toLowerCase().trim();
+  if (window.electronAuth && typeof window.electronAuth.getAccountToken === "function") {
     try {
-      const result = await window.electronAuth.getToken();
-      if (result.success && result.token) return result.token;
+      const result = await window.electronAuth.getAccountToken(email);
+      return result.success && result.token ? result.token : null;
     } catch (e) {
-      console.warn("getSessionToken: could not read stored token", e);
+      console.warn("getAccountTokenAnyPlatform: could not read stored token", e);
+      return null;
     }
-    return null;
   }
-  return localStorage.getItem("fieldscan_session_token") || null;
+  const accounts = JSON.parse(localStorage.getItem("fieldscan_accounts") || "[]");
+  const found = accounts.find((a) => String(a.email).toLowerCase().trim() === email);
+  return found ? found.token : null;
+}
+
+async function saveAccountTokenAnyPlatform(email, token) {
+  email = String(email).toLowerCase().trim();
+  if (window.electronAuth && typeof window.electronAuth.saveAccountToken === "function") {
+    await window.electronAuth.saveAccountToken(email, token);
+    return;
+  }
+  const accounts = JSON.parse(localStorage.getItem("fieldscan_accounts") || "[]");
+  const idx = accounts.findIndex((a) => String(a.email).toLowerCase().trim() === email);
+  const entry = { email, token, lastUsedAt: Date.now() };
+  if (idx === -1) accounts.push(entry);
+  else accounts[idx] = entry;
+  localStorage.setItem("fieldscan_accounts", JSON.stringify(accounts));
+}
+
+async function listAccountsAnyPlatform() {
+  if (window.electronAuth && typeof window.electronAuth.listAccounts === "function") {
+    try {
+      const result = await window.electronAuth.listAccounts();
+      return result.success ? result.accounts : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  const accounts = JSON.parse(localStorage.getItem("fieldscan_accounts") || "[]");
+  return accounts
+    .map((a) => ({ email: a.email, lastUsedAt: a.lastUsedAt }))
+    .sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+}
+
+async function removeAccountAnyPlatform(email) {
+  email = String(email).toLowerCase().trim();
+  if (window.electronAuth && typeof window.electronAuth.removeAccount === "function") {
+    await window.electronAuth.removeAccount(email);
+    return;
+  }
+  const accounts = JSON.parse(localStorage.getItem("fieldscan_accounts") || "[]").filter((a) => String(a.email).toLowerCase().trim() !== email);
+  localStorage.setItem("fieldscan_accounts", JSON.stringify(accounts));
+}
+
+/**
+ * Decodes (never verifies -- that's the server's job) a session
+ * token's payload just far enough to read its expiry, so a cached
+ * account can be checked for "still good" entirely offline, with no
+ * network call. Treats anything malformed as expired -- a safe default
+ * that just falls through to requiring a real login instead of risking
+ * treating a broken token as valid.
+ */
+function isTokenExpired(token) {
+  try {
+    const parts = String(token).split(".");
+    if (parts.length !== 3) return true;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    return typeof payload.exp !== "number" || Date.now() / 1000 > payload.exp;
+  } catch (e) {
+    return true;
+  }
 }
 
 /**
  * POSTs email+password directly to /api/login (NOT the main GAS_URL
  * dispatcher -- that one requires a token, which is exactly what this
- * call is trying to obtain) and persists the returned token wherever
- * this platform stores it (Electron's encrypted-at-rest file via IPC,
- * or plain localStorage for a browser/PWA deployment).
+ * call is trying to obtain) and caches the returned token as THIS
+ * account's entry -- alongside, not replacing, any other accounts
+ * already cached on this device.
  */
 async function login(email, password) {
   const loginUrl = GAS_URL.replace(/\/api\/?$/, "") + "/api/login";
@@ -190,12 +268,8 @@ async function login(email, password) {
     throw new Error(result.message || "Invalid email or password");
   }
 
-  if (window.electronAuth && typeof window.electronAuth.saveToken === "function") {
-    await window.electronAuth.saveToken(result.token);
-  } else {
-    localStorage.setItem("fieldscan_session_token", result.token);
-  }
-  localStorage.setItem("fieldscan_user_email", result.email);
+  await saveAccountTokenAnyPlatform(result.email, result.token);
+  localStorage.setItem("fieldscan_user_email", String(result.email).toLowerCase().trim());
   FIELD_SCAN_USER.email = result.email;
   FIELD_SCAN_USER.role = result.role;
 
@@ -204,6 +278,32 @@ async function login(email, password) {
   return result;
 }
 window.login = login;
+
+/**
+ * Switches to an account already cached on this device -- entirely
+ * offline if its cached token hasn't expired, no password re-entry.
+ * Clears the fb_* local display cache either way (this is what
+ * actually guarantees no visible mixing between accounts, independent
+ * of whether the switch was instant or required a fresh login).
+ * Returns true if the instant switch worked; false means the caller
+ * should fall back to the normal email/password sign-in flow for this
+ * account instead (cached token missing or expired).
+ */
+async function switchToAccount(email) {
+  email = String(email).toLowerCase().trim();
+  const token = await getAccountTokenAnyPlatform(email);
+  if (!token || isTokenExpired(token)) return false;
+
+  // No cache-wiping needed here anymore -- backupKey() in backup.js is
+  // namespaced per account, so changing which email is active
+  // automatically reveals THAT account's own previously-synced data
+  // (if any), rather than an empty app until network returns. This is
+  // what makes offline switching actually useful, not just safe.
+  localStorage.setItem("fieldscan_user_email", email);
+  window.location.reload();
+  return true;
+}
+window.switchToAccount = switchToAccount;
 
 /**
  * A small, non-blocking banner shown at the top of the app when there's
@@ -262,11 +362,19 @@ window.handleSignInMenuClick = handleSignInMenuClick;
 async function logout(silent) {
   if (!silent && !confirm("Sign out?")) return;
   clearInactivityTimers();
-  if (window.electronAuth && typeof window.electronAuth.signOut === "function") {
-    await window.electronAuth.signOut();
-  } else {
-    localStorage.removeItem("fieldscan_session_token");
-  }
+  const email = localStorage.getItem("fieldscan_user_email");
+  // Deliberately different from a normal account switch: this REMOVES
+  // the account from the cache entirely, both for an explicit "Sign
+  // Out" click and an automatic inactivity timeout -- both are cases
+  // where the security intent is "prove who you are again next time,"
+  // not "keep this cached for instant switching back." A normal
+  // switch-away (see switchToAccount above) leaves the account cached.
+  if (email) await removeAccountAnyPlatform(email);
+  // No cache-wiping needed here either, same reasoning as switchToAccount
+  // above: backupKey() in backup.js is namespaced per account, so this
+  // account's cached data simply becomes inert once its token is
+  // removed -- it can't surface under any OTHER account, and signing
+  // back into this exact one requires the real password again anyway.
   window.location.reload();
 }
 window.logout = logout;
@@ -376,7 +484,7 @@ function onUserActivity() {
  * password form. Opened by clicking the "Sign In" menu item, or
  * automatically the first time a 401 is hit if it isn't already open.
  */
-function openSignInDialog() {
+function openEmailPasswordDialog(prefillEmail) {
   if (document.getElementById("fieldscan-signin-dialog")) return; // already open
 
   const overlay = document.createElement("div");
@@ -398,7 +506,7 @@ function openSignInDialog() {
   emailInput.type = "email";
   emailInput.placeholder = "Email";
   emailInput.autocomplete = "username";
-  emailInput.value = localStorage.getItem("fieldscan_user_email") || "";
+  emailInput.value = prefillEmail || localStorage.getItem("fieldscan_user_email") || "";
   emailInput.style.cssText = "width:100%;box-sizing:border-box;padding:10px;margin-bottom:10px;border-radius:8px;border:1.5px solid var(--border, #ccc);font-size:14px;";
 
   const passwordInput = document.createElement("input");
@@ -475,6 +583,87 @@ function openSignInDialog() {
   document.body.appendChild(overlay);
   (emailInput.value ? passwordInput : emailInput).focus();
 }
+window.openEmailPasswordDialog = openEmailPasswordDialog;
+
+/**
+ * The actual "Sign In" menu entry point. Shows a switcher listing
+ * every account cached on this device (each one tap away from an
+ * instant, fully offline switch if its cached token hasn't expired),
+ * plus a "Sign in as someone else" option that falls through to the
+ * plain email/password form above. Skips straight to that form if
+ * there's nothing cached yet at all -- no point showing an empty list.
+ */
+async function openSignInDialog() {
+  if (document.getElementById("fieldscan-signin-dialog")) return; // already open
+
+  const currentEmail = (localStorage.getItem("fieldscan_user_email") || "").toLowerCase().trim();
+  const accounts = (await listAccountsAnyPlatform()).filter((a) => String(a.email).toLowerCase().trim() !== currentEmail);
+
+  if (!accounts.length) {
+    openEmailPasswordDialog();
+    return;
+  }
+
+  const pendingCounts = await getPendingCountsByOtherAccounts();
+
+  const overlay = document.createElement("div");
+  overlay.id = "fieldscan-signin-dialog";
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.5);" +
+    "display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;";
+
+  const box = document.createElement("div");
+  box.style.cssText =
+    "background:#fff;border-radius:12px;padding:22px;max-width:340px;width:100%;" +
+    "box-shadow:0 8px 30px rgba(0,0,0,0.3);";
+
+  const title = document.createElement("h3");
+  title.textContent = "Switch Account";
+  title.style.cssText = "margin:0 0 14px 0;";
+  box.appendChild(title);
+
+  for (const account of accounts) {
+    const pending = pendingCounts[account.email] || 0;
+    const row = document.createElement("button");
+    row.type = "button";
+    row.style.cssText =
+      "display:flex;flex-direction:column;align-items:flex-start;width:100%;text-align:left;" +
+      "padding:10px 12px;margin-bottom:8px;border-radius:8px;border:1.5px solid var(--border,#ddd);" +
+      "background:#fff;cursor:pointer;font-size:14px;";
+    row.innerHTML =
+      `<span style="font-weight:600;">${escapeHtml(account.email)}</span>` +
+      (pending > 0
+        ? `<span style="font-size:12px;color:#b45309;margin-top:2px;">${pending} item${pending === 1 ? "" : "s"} waiting to sync</span>`
+        : "");
+    row.onclick = async () => {
+      row.disabled = true;
+      const switched = await switchToAccount(account.email);
+      if (!switched) {
+        // Cached token missing or expired -- fall back to a real login,
+        // pre-filled, rather than failing silently.
+        overlay.remove();
+        openEmailPasswordDialog(account.email);
+      }
+    };
+    box.appendChild(row);
+  }
+
+  const otherBtn = document.createElement("button");
+  otherBtn.type = "button";
+  otherBtn.textContent = "Sign in as someone else";
+  otherBtn.style.cssText =
+    "width:100%;padding:10px;margin-top:4px;border-radius:8px;border:none;" +
+    "background:#f1f5f9;color:#334155;font-weight:600;cursor:pointer;font-size:13px;";
+  otherBtn.onclick = () => {
+    overlay.remove();
+    openEmailPasswordDialog();
+  };
+  box.appendChild(otherBtn);
+
+  overlay.appendChild(box);
+  overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
 window.openSignInDialog = openSignInDialog;
 
 /**
@@ -487,18 +676,70 @@ async function checkAuthOnStartup() {
   try {
     const token = await getSessionToken();
     setSignInMenuState(!!token);
+
+    // Show the right company name immediately, from whatever's already
+    // cached locally for THIS company (namespaced per-account, so this
+    // is correct even offline and even right after switching). This is
+    // gated on fieldscan_user_email, deliberately NOT on having a valid
+    // token -- "signed out" in this offline-first app only means "no
+    // live connection to sync with," not "no active company context."
+    // The local cache (and the ability to keep queuing offline writes
+    // against it) stays fully alive and correctly scoped to whichever
+    // company you were last working in, sign-out or not.
+    const activeEmail = localStorage.getItem("fieldscan_user_email");
+    if (activeEmail) {
+      const cache = getCache();
+      cache.settings = readBackup("getSettings", cache.settings || {}, {});
+      setCache(cache);
+      if (typeof applyCompanyNameToSidebar === "function") applyCompanyNameToSidebar();
+    }
+
     // Runs on every launch AND right after a successful sign-in (login()
     // reloads the page, which re-runs this from scratch) -- so this is
     // the one place that naturally covers both "app just launched with
     // pending queue items from a previous offline session" and "just
     // signed in, flush anything that got queued while unauthenticated."
+    // Auto-sync and the live settings refresh below DO still require an
+    // actual valid token -- unlike the local-only seeding above, these
+    // genuinely need a real connection to the server.
     if (token && navigator.onLine) {
       syncQueuedRequests().catch((e) => console.error("Startup auto-sync failed, items remain queued for retry:", e));
+      // Also refresh settings from the server -- the local backup above
+      // is a good-enough instant guess, but the real company name (or
+      // logo, or anything else settings-driven) may have changed since
+      // it was last cached.
+      callApi("getSettings", {}).then((res) => {
+        if (res && typeof res === "object") {
+          const c = getCache();
+          c.settings = Object.assign({}, c.settings, res.data || res);
+          setCache(c);
+          if (typeof applyCompanyNameToSidebar === "function") applyCompanyNameToSidebar();
+        }
+      }).catch((e) => console.warn("Startup settings refresh failed, using cached value:", e));
     }
   } catch (e) {
     setSignInMenuState(false);
   }
 }
+/**
+ * Only meaningful for the browser/PWA case -- Electron's equivalent
+ * lives in main.js's app.whenReady(), which has a genuine "real launch
+ * vs. renderer-triggered reload" signal that a plain webpage doesn't
+ * have access to. sessionStorage is the closest browser equivalent: it
+ * survives page reloads within the same tab (so switchToAccount()'s and
+ * login()'s own reloads don't trigger this), but is cleared the moment
+ * the tab/window actually closes -- exactly the distinction needed to
+ * apply the same "real password required on every genuine app open"
+ * rule consistently on mobile/PWA too, not just desktop.
+ */
+function wipeAccountsIfGenuinelyFreshBrowserSession() {
+  if (window.electronAuth) return; // Electron handles this itself, in main.js
+  if (sessionStorage.getItem("fieldscan_session_active")) return; // just an in-page reload, not a real reopen
+  localStorage.removeItem("fieldscan_accounts");
+  sessionStorage.setItem("fieldscan_session_active", "1");
+}
+wipeAccountsIfGenuinelyFreshBrowserSession();
+
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", checkAuthOnStartup);
 } else {
@@ -708,8 +949,12 @@ const DEPENDENCY_ORDER = {
   // Foundational -- other things reference these by id, so they need
   // to sync (and get their real server-assigned id) before anything
   // that depends on them is attempted.
-  saveClient: 0,
-  updateClient: 0,
+  // NOTE: never use 0 as a priority here -- the sort below is
+  // `DEPENDENCY_ORDER[action] || 99`, and 0 is falsy in JS, so a
+  // priority of 0 gets silently treated as "missing" and falls back to
+  // 99 instead of sorting first. Found via testing, not by inspection.
+  saveClient: 0.1,
+  updateClient: 0.1,
   saveEstimate: 0.5,
   updateEstimate: 0.5,
   saveProject: 1,
@@ -718,15 +963,41 @@ const DEPENDENCY_ORDER = {
   updateVendor: 2,
   saveWorkOrder: 3,
   updateWorkOrder: 3,
-  saveTakeOffItem: 5,
-  updateTakeOffItem: 5,
-  deleteTakeOffItem: 5,
+  // Parent groups before the items that reference them via groupId --
+  // a Task/TakeOff created inside a brand-new offline group would
+  // otherwise face the exact same stale-temp-id problem as the
+  // client/estimate bug above.
+  saveTaskGroup: 4,
+  updateTaskGroup: 4,
+  saveTakeOffGroup: 4,
+  updateTakeOffGroup: 4,
+  saveTask: 4.5,
+  updateTask: 4.5,
+  deleteTask: 4.5,
+  // Was "saveTakeOffItem"/"updateTakeOffItem"/"deleteTakeOffItem" here
+  // before -- those never matched any real action name (the actual
+  // backend actions are saveTakeOff/updateTakeOff/deleteTakeOff, no
+  // "Item" suffix), so this ordering silently never applied at all;
+  // every take-off save was defaulting to the fallback priority 99.
+  saveTakeOff: 4.5,
+  updateTakeOff: 4.5,
+  deleteTakeOff: 4.5,
+  saveInspection: 5,
+  updateInspection: 5,
   saveProgressLog: 6,
   saveSnag: 7,
   updateSnag: 7,
   deleteSnag: 7,
+  // Photo before anything that references it (PhotoLink), same
+  // group-before-child reasoning as TaskGroup/TakeOffGroup above.
+  savePhoto: 7.5,
+  updatePhotoComment: 7.5,
+  updatePhotoMeta: 7.5,
   savePayment: 8,
   updatePayment: 8,
+  savePhotoLink: 8.5,
+  saveDocument: 8.5,
+  updateDocumentMetadata: 8.5,
   trashProject: 99,
   restoreProject: 1, // should happen early -- other pending saves for a just-restored project shouldn't be blocked behind it
   permanentlyDeleteProject: 100,
@@ -756,7 +1027,50 @@ window.runInBackground = runInBackground;
  * IndexedDB immediately (not just the in-memory copy), so the fix
  * survives even if the app closes partway through a sync.
  */
+/**
+ * Persistent map of temp id -> real id, per account (namespaced like
+ * everything else). This is what closes a real gap the two functions
+ * below don't cover on their own: they only fix OTHER items already
+ * sitting in the SAME sync batch. If a parent (e.g. a client created
+ * offline) happens to sync successfully in an earlier, separate
+ * syncQueuedRequests() run -- entirely plausible, since auto-sync fires
+ * independently on reconnect, on sign-in, and via manual "Sync Now" --
+ * and a child item (e.g. an estimate referencing that client) only
+ * gets queued or only gets its turn to sync LATER, nothing would ever
+ * go back and fix it. Recording every reconciliation here, and
+ * consulting it before every single send (not just within one batch),
+ * means the fix applies no matter how far apart in time the parent and
+ * child end up syncing.
+ */
+function recordIdMapping(oldIdVal, newIdVal) {
+  const key = backupKey("__idMappings", {});
+  const mappings = JSON.parse(localStorage.getItem(key) || "{}");
+  mappings[oldIdVal] = newIdVal;
+  localStorage.setItem(key, JSON.stringify(mappings));
+}
+
+/**
+ * Applies every KNOWN mapping (not just ones from this batch) to a
+ * single queued item's data before it's sent -- resolving a temp id
+ * that became real in a completely separate, earlier sync run.
+ */
+function applyKnownIdMappings(item) {
+  const key = backupKey("__idMappings", {});
+  const mappings = JSON.parse(localStorage.getItem(key) || "{}");
+  if (!Object.keys(mappings).length) return;
+  let json = JSON.stringify(item.data);
+  let changed = false;
+  for (const [oldIdVal, newIdVal] of Object.entries(mappings)) {
+    if (json.includes(oldIdVal)) {
+      json = json.split(oldIdVal).join(newIdVal);
+      changed = true;
+    }
+  }
+  if (changed) item.data = JSON.parse(json);
+}
+
 async function reconcileQueuedIdReferences(queue, justCompletedItemId, oldIdVal, newIdVal) {
+  recordIdMapping(oldIdVal, newIdVal);
   for (const item of queue) {
     if (item.id === justCompletedItemId) continue;
     const before = JSON.stringify(item.data);
@@ -791,7 +1105,7 @@ function reconcileLocalCacheIdReferences(oldIdVal, newIdVal) {
 
 async function syncQueuedRequests() {
   await updateSyncStatus();
-  let queue = await getQueuedRequests();
+  let queue = await getQueuedRequestsForCurrentAccount();
   if (!queue.length) return;
   showSyncToast("🔄 Syncing offline data...", 10000);
   queue.sort(
@@ -800,6 +1114,10 @@ async function syncQueuedRequests() {
   );
   const failedActions = [];
   for (let item of queue) {
+    // Resolve any reference this item has to something that turned out
+    // to be a temp id whose real id is already known -- from THIS
+    // batch's reconciliations, or from any earlier, separate sync run.
+    applyKnownIdMappings(item);
     let retries = 3,
       delay = 1000,
       success = false;
@@ -897,7 +1215,7 @@ async function syncQueuedRequests() {
 async function updateSyncStatus() {
   const badge = document.getElementById("sync-status");
   const pendingBadge = document.getElementById("sync-pending-badge");
-  const queue = await getQueuedRequests();
+  const queue = await getQueuedRequestsForCurrentAccount();
   if (pendingBadge) {
     pendingBadge.textContent = queue.length;
     pendingBadge.style.display = queue.length ? "inline-block" : "none";
@@ -929,7 +1247,7 @@ window.openSyncQueuePanel = openSyncQueuePanel;
 async function renderSyncQueuePanelBody(panelId) {
   const body = document.getElementById(panelId + "-body");
   if (!body) return;
-  const queue = (await getQueuedRequests()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  const queue = (await getQueuedRequestsForCurrentAccount()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
   if (!queue.length) {
     body.innerHTML = '<p style="text-align:center; padding:20px; color:var(--muted);">No pending sync items.</p>';
@@ -982,7 +1300,7 @@ async function deleteSingleQueuedItem(id, panelId) {
 window.deleteSingleQueuedItem = deleteSingleQueuedItem;
 
 async function clearAllQueuedItems(panelId) {
-  const queue = await getQueuedRequests();
+  const queue = await getQueuedRequestsForCurrentAccount();
   if (!queue.length) return;
   if (!confirm("Discard all " + queue.length + " pending sync item(s)? This can't be undone — none of these changes will ever reach the server.")) return;
   for (const item of queue) {
@@ -995,7 +1313,7 @@ async function clearAllQueuedItems(panelId) {
 window.clearAllQueuedItems = clearAllQueuedItems;
 
 async function retryQueuedRequest(id) {
-  const queue = await getQueuedRequests();
+  const queue = await getQueuedRequestsForCurrentAccount();
   const item = queue.find((q) => q.id === id);
   if (!item) return;
   const payload = buildRequestEnvelope(item.action, item.data);
@@ -1106,6 +1424,7 @@ async function refreshAllData() {
         settingsRes.data || settingsRes,
       );
       setCache(c);
+      if (typeof applyCompanyNameToSidebar === "function") applyCompanyNameToSidebar();
     }
     await refreshMasterDashboard();
     if (currentSelectedProjectId) {

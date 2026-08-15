@@ -97,8 +97,22 @@ function backupKey(action, params) {
   // belonging to a completely different group (see the "protect against
   // empty responses" guard in callApi). Global, unparameterized actions
   // (getProjects, getVendors, etc.) keep the old plain key.
+  //
+  // Also namespaced by which ACCOUNT is currently active. Without this,
+  // switching between two companies on the same device would need to
+  // either wipe the whole cache (safe, but means offline switching shows
+  // an empty app until network returns -- exactly the wrong experience)
+  // or risk one company's cached data staying visible after switching
+  // to another. Namespacing avoids the tradeoff entirely: each account's
+  // cache is a genuinely separate set of keys, so switching just makes a
+  // different, already-correct set of keys become the active ones --
+  // nothing to clear, and each account's own previously-synced data is
+  // there waiting for it, online or off.
+  const email = (localStorage.getItem("fieldscan_user_email") || "").toLowerCase().trim();
   const hasParams = params && typeof params === "object" && Object.keys(params).length > 0;
-  return hasParams ? `fb_${action}:${JSON.stringify(params)}` : `fb_${action}`;
+  return hasParams
+    ? `fb_${email}__${action}:${JSON.stringify(params)}`
+    : `fb_${email}__${action}`;
 }
 function readBackup(action, fallback = [], params) {
   const raw = localStorage.getItem(backupKey(action, params));
@@ -657,6 +671,7 @@ async function saveCompanyDetails() {
     for (const [key, value] of fieldsToSave) cache.settings.data[key] = value;
     setCache(cache);
     if (typeof writeBackup === "function") writeBackup("getSettings", cache.settings, {});
+    if (typeof applyCompanyNameToSidebar === "function") applyCompanyNameToSidebar();
 
     document.getElementById("company-details-dialog").remove();
     if (typeof showSyncToast === "function") showSyncToast("✅ Company details saved");
