@@ -117,6 +117,7 @@ function openClientModal(editData) {
           const cache2 = getCache();
           cache2.clients = clientsList;
           setCache(cache2);
+          if (typeof writeBackup === "function") writeBackup("getClients", clientsList, {});
           closeModal();
           renderClientsPage();
           if (typeof showSyncToast === "function") {
@@ -159,6 +160,7 @@ function openClientModal(editData) {
         }
         cache2.clients = clientsList;
         setCache(cache2);
+        if (typeof writeBackup === "function") writeBackup("getClients", clientsList, {});
         closeModal();
         renderClientsPage();
         if (typeof window.estOnClientsRefreshed === "function") window.estOnClientsRefreshed();

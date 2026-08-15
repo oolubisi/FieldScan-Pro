@@ -183,18 +183,12 @@ function fieldScanLocalKeys() {
 function loadSettingsView() {
   const workingFolder = document.getElementById("pref-working-folder");
   const backendUrl = document.getElementById("pref-backend-url");
-  const userEmail = document.getElementById("pref-user-email");
-  const userRole = document.getElementById("pref-user-role");
   if (workingFolder)
     workingFolder.value = localStorage.getItem("fieldscan_working_folder") || "";
   if (backendUrl)
     backendUrl.value =
       localStorage.getItem("fieldscan_backend_url") ||
       (typeof DEFAULT_GAS_URL !== "undefined" ? DEFAULT_GAS_URL : "");
-  if (userEmail)
-    userEmail.value = localStorage.getItem("fieldscan_user_email") || "";
-  if (userRole)
-    userRole.value = localStorage.getItem("fieldscan_user_role") || "admin";
   renderBackupSummary();
   populatePaymentDetailsSettings();
   populateMySignatureSettings();
@@ -435,8 +429,6 @@ window.runPaymentVendorBackfill = runPaymentVendorBackfill;
 function savePreferences() {
   const workingFolder = document.getElementById("pref-working-folder");
   const backendUrl = document.getElementById("pref-backend-url");
-  const userEmail = document.getElementById("pref-user-email");
-  const userRole = document.getElementById("pref-user-role");
   if (workingFolder)
     localStorage.setItem("fieldscan_working_folder", workingFolder.value.trim());
   if (backendUrl) {
@@ -446,10 +438,6 @@ function savePreferences() {
       if (typeof GAS_URL !== "undefined") GAS_URL = url;
     }
   }
-  if (userEmail)
-    localStorage.setItem("fieldscan_user_email", userEmail.value.trim());
-  if (userRole)
-    localStorage.setItem("fieldscan_user_role", userRole.value || "admin");
   showSyncToast("✅ Preferences saved");
   renderBackupSummary();
 }
