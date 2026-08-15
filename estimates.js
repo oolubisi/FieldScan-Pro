@@ -374,6 +374,7 @@ function openEstimateModal(editData) {
     footer.appendChild(deleteBtn);
     deleteBtn.onclick = function () {
       if (confirm("Delete this estimate?")) {
+        deleteBtn.disabled = true;
         callApi("deleteEstimate", { estimateId: editData.estimateId }).then(function () {
           estimatesList = estimatesList.filter(function (e) { return e.estimateId !== editData.estimateId; });
           const cache2 = getCache();
@@ -381,6 +382,13 @@ function openEstimateModal(editData) {
           setCache(cache2);
           closeFullPagePanel(panelId);
           renderEstimatesPage();
+        }).catch(function (e) {
+          // Previously unhandled entirely -- a rejected delete (e.g. an
+          // accepted estimate already converted into a project) failed
+          // completely silently: no alert, no log, the estimate just
+          // stayed in the list with no explanation why.
+          alert("Could not delete: " + (e && e.message ? e.message : "Unknown error"));
+          deleteBtn.disabled = false;
         });
       }
     };
