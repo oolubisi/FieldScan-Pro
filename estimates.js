@@ -383,11 +383,23 @@ function openEstimateModal(editData) {
           closeFullPagePanel(panelId);
           renderEstimatesPage();
         }).catch(function (e) {
-          // Previously unhandled entirely -- a rejected delete (e.g. an
-          // accepted estimate already converted into a project) failed
-          // completely silently: no alert, no log, the estimate just
-          // stayed in the list with no explanation why.
-          alert("Could not delete: " + (e && e.message ? e.message : "Unknown error"));
+          const message = e && e.message ? e.message : "";
+          if (message.includes("404") || message.toLowerCase().includes("not found")) {
+            // Already gone server-side (e.g. cascade-deleted along with
+            // a project that was since purged from Trash, or removed by
+            // a bulk clear) -- the local list was just stale. The end
+            // state the user wants is already true, so this isn't
+            // really a failure worth alarming them about.
+            estimatesList = estimatesList.filter(function (est) { return est.estimateId !== editData.estimateId; });
+            const cache2 = getCache();
+            cache2.estimates = estimatesList;
+            setCache(cache2);
+            closeFullPagePanel(panelId);
+            renderEstimatesPage();
+            if (typeof showSyncToast === "function") showSyncToast("Already removed — your local view was out of date");
+            return;
+          }
+          alert("Could not delete: " + (message || "Unknown error"));
           deleteBtn.disabled = false;
         });
       }
@@ -1074,7 +1086,7 @@ async function renderEstimateReportDoc(est) {
     (logoUrl ? '<img src="' + escapeAttr(logoUrl) + '" style="max-height:' + Math.round(80 * logoSizeFactor) + 'px; max-width:' + Math.round(200 * logoSizeFactor) + 'px; object-fit:contain;" onerror="this.style.display=\'none\'">' : "") +
     '<div style="font-size:10px; color:#495057; margin-top:4px;">' + contactLine + '<br>' + escapeHtml(contactLine2) + '</div></div></div>' +
     '<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:18px; gap:20px;">' +
-    '<div style="font-size:12px; line-height:1.6; max-width:45mm; overflow-wrap:break-word; word-wrap:break-word;"><strong style="font-size:14px;">' + escapeHtml(est.clientName || "") + '</strong><br>' + addressLines + '</div>' +
+    '<div style="font-size:12px; line-height:1.6; max-width:63mm; overflow-wrap:break-word; word-wrap:break-word;"><strong style="font-size:14px;">' + escapeHtml(est.clientName || "") + '</strong><br>' + addressLines + '</div>' +
     '<div style="font-size:12px; flex-shrink:0;"><div><strong>Estimate No:</strong> ' + escapeHtml(est.estimateNumber || "DRAFT") + '</div>' +
     '<div><strong>Date:</strong> ' + (est.estimateDate ? escapeHtml(new Date(est.estimateDate).toLocaleDateString()) : "") + '</div>' +
     '<div><strong>Valid Until:</strong> ' + (est.validUntilDate ? escapeHtml(new Date(est.validUntilDate).toLocaleDateString()) : "") + '</div></div>' +
