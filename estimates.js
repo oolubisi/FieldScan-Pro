@@ -355,6 +355,9 @@ function openEstimateModal(editData) {
     '<div style="display:flex; justify-content:space-between; padding:4px 0; font-size:13px;"><span id="est-disp-vat-label">VAT (7.5%)</span><span id="est-disp-vat">₦0.00</span></div>' +
     '<div style="display:flex; justify-content:space-between; padding:8px 0; font-size:16px; font-weight:900; border-top:2px solid #000; margin-top:4px;"><span>Total</span><span id="est-disp-total">₦0.00</span></div>' +
     '</div>' +
+    '<label style="display:flex; align-items:center; gap:8px; margin-top:14px; cursor:pointer; font-weight:800;">' +
+    '<input type="checkbox" id="est_show_account_details" ' + (isEdit && editData.showAccountDetails === false ? "" : "checked") + ' style="width:auto;">' +
+    'Show account details on printed estimate</label>' +
     '<label ' + labelStyle + '>Please Note: <span style="font-weight:400; color:var(--muted); font-size:12px;">(conditions — one per line, numbered automatically)</span></label>' +
     '<textarea id="est_conditions" rows="4" ' + largeInput + '>' + escapeHtml(isEdit ? editData.conditions || "" : "") + '</textarea>';
 
@@ -456,6 +459,7 @@ function openEstimateModal(editData) {
       discountEnabled: estDiscountEnabled,
       status: document.getElementById("est_status").value,
       conditions: document.getElementById("est_conditions").value,
+      showAccountDetails: document.getElementById("est_show_account_details").checked,
       projectIdCreated: isEdit ? editData.projectIdCreated || "" : "",
     };
     return callApi(isEdit ? "updateEstimate" : "saveEstimate", payload)
@@ -1077,6 +1081,16 @@ async function renderEstimateReportDoc(est) {
     : "";
 
   const signatureHtml = await generateInspectionSignatureBlocks((await _getSignatoryName()) || "Kayode Olubisi");
+  // Defaults to shown (matches showAccountDetails !== false everywhere
+  // else) so estimates saved before this toggle existed still show it,
+  // rather than silently losing it for every estimate created so far.
+  const accountDetailsHtml = est.showAccountDetails !== false
+    ? '<div style="border:1px solid #000; padding:8px 12px; font-size:11px; line-height:1.7; align-self:flex-end; min-width:120px; margin-left:20mm;">' +
+      (settings.Account_Name ? '<div>' + escapeHtml(settings.Account_Name) + '</div>' : '') +
+      (settings.Bank_Name ? '<div>' + escapeHtml(settings.Bank_Name) + '</div>' : '') +
+      (settings.Account_Number ? '<div>' + escapeHtml(settings.Account_Number) + '</div>' : '') +
+      '</div>'
+    : '';
   const addressLines = String(est.clientAddress || "").split("\n").map(escapeHtml).join("<br>");
 
   return (
@@ -1101,7 +1115,7 @@ async function renderEstimateReportDoc(est) {
     (est.headerLine ? '<tr><td colspan="5" style="padding:8px 6px 4px; font-weight:800; text-transform:uppercase; font-size:13px;">' + escapeHtml(est.headerLine) + '</td></tr>' : "") +
     bodyRowsHtml + '</tbody></table>' +
     '<div style="display:flex; justify-content:space-between; align-items:flex-end; gap:20px; margin:0; padding:0; page-break-inside:avoid;">' +
-    '<div style="align-self:flex-end;" id="est-signature-block">' + signatureHtml + '</div>' +
+    '<div style="align-self:flex-end; display:flex; align-items:flex-end; gap:14px;" id="est-signature-block">' + signatureHtml + accountDetailsHtml + '</div>' +
     '<div style="max-width:320px; flex-shrink:0; padding-top:10px; align-self:flex-end;"><div id="est-discount-block">' + discountRows.join("") + '</div><div id="est-vat-line" style="margin-top:10px;">' + totalRows.join("") + '</div></div>' +
     '</div>' +
     '<div style="width:80mm; max-width:80mm; box-sizing:content-box; overflow-wrap:break-word; word-wrap:break-word; margin-top:-60px; padding-left:200px;">' + conditionsHtml + '</div>' +
