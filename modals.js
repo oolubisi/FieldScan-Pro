@@ -999,7 +999,7 @@ ${projects.map((p) => `<option value="${escapeAttr(p.clientName)}" data-project-
       : isSmallExpense
         ? ""
         : "";
-    body.innerHTML = `<label ${labelStyle}>ID</label><input value="${isEdit ? editData.paymentId || "Auto-generated" : "Auto-generated"}" disabled style="${largeInput} background:#f0f0f0;"><input type="hidden" id="pay_id_hidden" value="${escapeAttr(isEdit ? editData.paymentId : "")}"><input type="hidden" id="pay_group_id" value="${escapeAttr(isEdit && editData.paymentGroupId ? editData.paymentGroupId : "")}"><label ${labelStyle}>Direction</label><select id="pay_dir" ${largeInput} onchange="window.onPaymentDirectionChange()">
+    body.innerHTML = `<label ${labelStyle}>ID</label><input value="${isEdit ? editData.paymentId || "Auto-generated" : "Auto-generated"}" disabled style="${largeInput} background:#f0f0f0;"><input type="hidden" id="pay_id_hidden" value="${escapeAttr(isEdit ? editData.paymentId : "")}"><input type="hidden" id="pay_group_id" value="${escapeAttr(isEdit && editData.paymentGroupId ? editData.paymentGroupId : "")}"><label ${labelStyle}>Date</label><input id="pay_date" type="date" value="${escapeAttr(isEdit && editData.paymentDate ? String(editData.paymentDate).slice(0, 10) : new Date().toISOString().slice(0, 10))}" ${largeInput}><label ${labelStyle}>Direction</label><select id="pay_dir" ${largeInput} onchange="window.onPaymentDirectionChange()">
 <option value="Client Receipt" ${currentDir === "Client Receipt" ? "selected" : ""}>Client Receipt</option>
 <option value="Outgoing Payment" ${currentDir === "Outgoing Payment" ? "selected" : ""}>Outgoing Payment</option>
 <option value="Small Expense" ${currentDir === "Small Expense" ? "selected" : ""}>Small Expense</option>
@@ -1082,9 +1082,15 @@ ${projects.map((p) => `<option value="${escapeAttr(p.clientName)}" data-project-
       }
       submit.disabled = true;
       submit.innerText = "Saving...";
+      // A brand-new multi-stage payment (no existing group yet) used to
+      // invent a fake client-side id here ("PAY-GRP-" + timestamp) and
+      // send it as paymentGroupId -- but that column is a real uuid on
+      // the server, and a string like that isn't one. The backend
+      // already has the correct mechanism for this: send nothing, and
+      // it inserts the payment then self-links payment_group_id to its
+      // own real generated id. Leaving this empty (not inventing a
+      // fake value) is what actually lets that happen.
       let paymentGroupId = document.getElementById("pay_group_id").value;
-      if (!isEdit && !isSmall && !paymentGroupId)
-        paymentGroupId = "PAY-GRP-" + Date.now();
 
       // ✅ FIX: distinguish "Add Stage" (new record) from true edit
       const isRealEdit = isEdit && editData.paymentId;
@@ -1092,7 +1098,7 @@ ${projects.map((p) => `<option value="${escapeAttr(p.clientName)}" data-project-
       const payload = {
         paymentId: isRealEdit ? editData.paymentId : "PAY-" + Date.now(),
         projectId: getCurrentProjectId(),
-        paymentDate: todayFormatted(),
+        paymentDate: document.getElementById("pay_date").value || new Date().toISOString().slice(0, 10),
         paymentDirection: direction,
         payee: payee,
         vendorId: direction === "Outgoing Payment"
