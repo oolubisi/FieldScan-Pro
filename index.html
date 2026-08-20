@@ -367,6 +367,7 @@
             <option value="scope">Project Scope</option>
             <option value="snags">Snags Report</option>
             <option value="progress">Progress Report</option>
+            <option value="executive_project">Executive Project Report</option>
             <option value="workorder_report">Work Orders</option>
           </select>
 
@@ -404,6 +405,23 @@
             />
             Include signature block
           </label>
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-top: 12px;
+              font-weight: 800;
+            "
+          >
+            <input
+              type="checkbox"
+              id="rep-show-contract-summary"
+              checked
+              style="width: auto"
+            />
+            Show contract/tax summary (Contract Subtotal, VAT, WHT, Net Receivable)
+          </label>
 
           <div
             id="rep-orientation-wrap"
@@ -424,9 +442,68 @@
               <option value="landscape">Landscape (A4)</option>
             </select>
           </div>
-          <button class="action-btn" onclick="compileFieldReport(this)">
-            <i class="fas fa-file-alt"></i> Generate Report
-          </button>
+
+          <div
+            id="rep-period-wrap"
+            style="margin-top: 10px; display: none"
+          >
+            <label>Reporting Period</label>
+            <select
+              id="rep-period-mode"
+              onchange="window.toggleExecutivePeriodMode()"
+              style="
+                width: 100%;
+                padding: 14px;
+                font-size: 16px;
+                border-radius: 12px;
+                border: 1.5px solid var(--border);
+              "
+            >
+              <option value="entire">Entire Project</option>
+              <option value="range">Pick Start &amp; End Date</option>
+            </select>
+            <div id="rep-period-range-wrap" style="display: none; margin-top: 8px;">
+              <label>Start Date</label>
+              <input
+                type="date"
+                id="rep-period-start"
+                style="
+                  width: 100%;
+                  padding: 14px;
+                  font-size: 16px;
+                  border-radius: 12px;
+                  border: 1.5px solid var(--border);
+                "
+              />
+              <label style="margin-top: 8px;">End Date</label>
+              <input
+                type="date"
+                id="rep-period-end"
+                style="
+                  width: 100%;
+                  padding: 14px;
+                  font-size: 16px;
+                  border-radius: 12px;
+                  border: 1.5px solid var(--border);
+                "
+              />
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap">
+            <button
+              class="action-btn mobile-only-action"
+              style="flex: 1; min-width: 120px"
+              onclick="saveReportPDF()"
+            >
+              <i class="fas fa-file-pdf"></i> Save PDF
+            </button>
+            <button class="action-btn mobile-only-action" onclick="shareReport()">
+              <i class="fas fa-share-alt"></i> Share
+            </button>
+            <button class="action-btn desktop-only-action" onclick="printReport()">
+              <i class="fas fa-print"></i> Print
+            </button>
+          </div>
           <div
             id="report-status-message"
             style="display: none; margin-top: 10px; font-size: 13px; color: var(--muted); font-weight: 700;"
@@ -438,26 +515,6 @@
           style="display: none"
         >
           <div id="report-preview-viewport"></div>
-          <div
-            style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap"
-          >
-            <button
-              class="action-btn mobile-only-action"
-              style="flex: 1; min-width: 120px"
-              onclick="saveReportPDF()"
-            >
-              <i class="fas fa-file-pdf"></i> Save PDF
-            </button>
-            <button class="action-btn mobile-only-action" onclick="shareReport()">
-              <i class="fas fa-share-alt"></i> Share
-            </button>
-            <button
-              class="action-btn desktop-only-action"
-              onclick="printReport()"
-            >
-              <i class="fas fa-print"></i> Print
-            </button>
-          </div>
         </div>
         <div id="report-print-container" style="display: none"></div>
       </div>

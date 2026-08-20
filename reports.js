@@ -3,13 +3,39 @@
 // Track current report type for layout system
 let currentReportType = "";
 
+// Report date fields (paymentDate, dateRecorded, etc.) come back from the
+// database as either a plain "YYYY-MM-DD" string or a full ISO timestamp
+// like "2026-08-20T00:00:00.000Z" depending on how pg serialized the
+// column -- reports were showing the raw value either way, so a payment
+// made "today" printed with a full timestamp instead of just the date.
+// This always shows just the date portion, regardless of which shape came
+// back, without needing a real Date object (avoiding timezone shifting a
+// date-only value by a day near midnight).
+function ymd(dateValue) {
+  return String(dateValue || "").slice(0, 10);
+}
+
+// Payment status is stored as "Cleared"/"Pending" (matches the backend's
+// own status values, computed in savePayment), but reads clearer on a
+// printed project report as "Paid"/"Part-Payment" -- this only affects
+// display, never what's actually stored or sent to the server.
+function displayPaymentStatus(status) {
+  if (status === "Cleared") return "Paid";
+  if (status === "Pending") return "Part-Payment";
+  return status;
+}
+
 async function generateReportPDF(orientation) {
+  // Same fix as printReport: this used to require a separate Generate
+  // step first and just alert if skipped. Now it always regenerates
+  // fresh itself, so Save PDF and Share work as standalone actions too.
+  await compileFieldReport();
   orientation = (orientation || "portrait").toLowerCase();
   const isLandscape = orientation === "landscape" || orientation === "l";
   const jsPdfOrientation = isLandscape ? "landscape" : "portrait";
   const container = document.getElementById("report-print-container");
   if (!container || !container.innerText.trim()) {
-    alert("Generate a report first");
+    alert("Could not generate the report. Check the report type and try again.");
     return null;
   }
   if (typeof html2canvas === "undefined" || typeof jspdf === "undefined") {
@@ -133,10 +159,16 @@ async function generateReportPDF(orientation) {
   }
 }
 
-function printReport() {
+async function printReport() {
+  // Print used to require Generate to have been run first, showing an
+  // alert and refusing otherwise. Print now does both steps itself --
+  // always regenerating fresh (so what prints reflects the current data,
+  // not whatever was last generated, possibly a while ago) rather than
+  // needing a separate button click before this one would even work.
+  await compileFieldReport();
   const container = document.getElementById("report-print-container");
   if (!container || !container.innerText.trim()) {
-    alert("Generate a report first");
+    alert("Could not generate the report to print. Check the report type and try again.");
     return;
   }
   const statusEl =
@@ -282,7 +314,8 @@ function handleReportScopePopulation() {
     type === "financial_project" ||
     type === "scope" ||
     type === "snags" ||
-    type === "progress"
+    type === "progress" ||
+    type === "executive_project"
   )
     validScopes = ["project"];
   else if (type === "workorder_report") validScopes = ["project"];
@@ -316,9 +349,19 @@ function handleReportScopePopulation() {
   const orientWrap = document.getElementById("rep-orientation-wrap");
   if (orientWrap)
     orientWrap.style.display = type === "financial_all" ? "block" : "none";
+  const periodWrap = document.getElementById("rep-period-wrap");
+  if (periodWrap)
+    periodWrap.style.display = type === "executive_project" ? "block" : "none";
   handleReportFilterPopulation();
   updateFieldSelectorVisibility();
 }
+
+function toggleExecutivePeriodMode() {
+  const mode = document.getElementById("rep-period-mode").value;
+  const rangeWrap = document.getElementById("rep-period-range-wrap");
+  if (rangeWrap) rangeWrap.style.display = mode === "range" ? "block" : "none";
+}
+window.toggleExecutivePeriodMode = toggleExecutivePeriodMode;
 
 async function handleReportFilterPopulation() {
   const scopeSel = document.getElementById("rep-scope-sel");
@@ -565,9 +608,15 @@ function computeProjectFinancials(project, payments) {
   };
 }
 
-function financialRowHTML(label, amount, isBold, color) {
+function financialRowHTML(label, amount, isBold, color, showTopBorder) {
+  // showTopBorder defaults to matching isBold (the original behavior),
+  // but can be explicitly set to false to keep the bold/larger styling
+  // of a "total"-style row without the divider line above it -- useful
+  // for a row that's the FIRST in its group, where a line above it
+  // doesn't read as a subtotal separator the way it does at the bottom.
+  if (showTopBorder === undefined) showTopBorder = isBold;
   const style = isBold
-    ? "font-weight: 900; border-top: 1.5px solid #000; padding-top: 6px; margin-top: 6px;"
+    ? `font-weight: 900; ${showTopBorder ? "border-top: 1.5px solid #000; padding-top: 6px;" : ""} margin-top: 6px;`
     : "";
   const colorStyle = color ? `color: ${color};` : "";
   return `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; ${style}"><span style="font-weight: ${isBold ? "900" : "600"}; font-size: ${isBold ? "14px" : "13px"};">${escapeHtml(label)}</span><span style="font-weight: ${isBold ? "900" : "700"}; font-size: ${isBold ? "15px" : "13px"}; text-align: right; ${colorStyle}">₦${moneyValue(amount)}</span></div>`;
@@ -734,10 +783,10 @@ function paymentDetailRowsHTML(payments) {
       const who = isSmall ? p.expenseCategory || "Expense" : p.payee || "—";
       const stageTxt = p.stage ? `Stage ${escapeHtml(p.stage)}` : "";
       return `<tr>
-        <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.paymentDate || "—")}</td>
+        <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(ymd(p.paymentDate) || "—")}</td>
         <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(who)}</td>
         <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.paymentDirection || "—")}${stageTxt ? " · " + stageTxt : ""}</td>
-        <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:center;">${escapeHtml(p.status || "—")}</td>
+        <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:center;">${escapeHtml(displayPaymentStatus(p.status) || "—")}</td>
         <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700; color:${color};">${sign}₦${moneyValue(p.amount)}</td>
       </tr>`;
     })
@@ -759,8 +808,224 @@ async function renderFinancialProject(project, payments) {
   const projectPayments = payments.filter(
     (p) => p.projectId === project.projectId,
   );
+  const showContractSummary = document.getElementById("rep-show-contract-summary")
+    ? document.getElementById("rep-show-contract-summary").checked
+    : true; // no checkbox present (e.g. a different report page) -- default to showing it, matches prior behavior
+  const topBlockHtml = showContractSummary
+    ? `${financialRowHTML("Contract Subtotal", f.subtotal)}${financialRowHTML("VAT (" + formatTaxRate(getTaxRate("VAT")) + ")", f.vat)}${financialRowHTML("Total Contract Value", f.totalContract, true)}${financialRowHTML("WHT (" + formatTaxRate(getTaxRate("WHT")) + ")", f.wht)}${financialRowHTML("Net Receivable (after WHT)", f.netReceivable, true)}<div style="height: 10px;"></div>`
+    : "";
+  const bottomBlockHtml = `${financialRowHTML("Client Funds Received (Cleared)", f.totalReceived, false, "var(--success)")}${financialRowHTML("Total Outgoing (Cleared)", f.totalOutgoing, false, "var(--danger)")}${financialRowHTML("Small Expenses (Cleared)", f.smallExpenses)}${financialRowHTML("Pending Payments", f.totalPending, false, "#fd7e14")}<div style="height: 10px;"></div>${financialRowHTML("Balance Expected", f.balanceExpected, true)}${financialRowHTML("Net Profit", f.netProfit, true, f.netProfit >= 0 ? "var(--success)" : "var(--danger)")}`;
   return wrapReportPage(
-    `${await generateReportHeader("Financial Report — Project", project)}<div style="max-width: 420px; margin: 0 auto;">${financialRowHTML("Contract Subtotal", f.subtotal)}${financialRowHTML("VAT (" + formatTaxRate(getTaxRate("VAT")) + ")", f.vat)}${financialRowHTML("Total Contract Value", f.totalContract, true)}${financialRowHTML("WHT (" + formatTaxRate(getTaxRate("WHT")) + ")", f.wht)}${financialRowHTML("Net Receivable (after WHT)", f.netReceivable, true)}<div style="height: 10px;"></div>${financialRowHTML("Client Receipts (Cleared)", f.totalReceived, false, "var(--success)")}${financialRowHTML("Total Outgoing (Cleared)", f.totalOutgoing, false, "var(--danger)")}${financialRowHTML("Small Expenses (Cleared)", f.smallExpenses)}${financialRowHTML("Pending Payments", f.totalPending, false, "#fd7e14")}<div style="height: 10px;"></div>${financialRowHTML("Balance Expected", f.balanceExpected, true)}${financialRowHTML("Net Profit", f.netProfit, true, f.netProfit >= 0 ? "var(--success)" : "var(--danger)")}</div><h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Payment Details</h3>${paymentDetailRowsHTML(projectPayments)}`,
+    `${await generateReportHeader("Financial Report — Project", project)}<div style="max-width: 420px; margin: 0 auto;">${topBlockHtml}</div><div style="max-width: 420px; margin: 0;">${bottomBlockHtml}</div><h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Payment Details</h3>${paymentDetailRowsHTML(projectPayments)}`,
+  );
+}
+
+/**
+ * Executive Project Report -- a condensed, one-page-friendly summary for
+ * stakeholders, not an exhaustive itemized report. Combines a cumulative
+ * project snapshot (contract value, spend-to-date, balance, physical
+ * progress) with a focused look at just what happened in ONE reporting
+ * period (a specific month) -- payments made and progress logged during
+ * that period specifically, not the full project history. periodMonth is
+ * an "YYYY-MM" string, matching a native <input type="month">.
+ */
+/**
+ * Builds a simple SVG pie chart -- no external chart library, so it
+ * actually prints correctly (a canvas-based chart can render blank in
+ * window.print() depending on timing; SVG has no such issue). All slice
+ * values are expected to already be non-negative (Math.abs applied by
+ * the caller) -- a pie chart can't meaningfully represent a negative
+ * share of a whole.
+ */
+function buildPieChartSvg(slices) {
+  const total = slices.reduce((s, sl) => s + sl.value, 0);
+  const cx = 112.5, cy = 112.5, r = 100; // 25% larger than the original 90/90/80
+  if (total <= 0) {
+    // No activity yet (e.g. a brand-new project) -- a neutral placeholder,
+    // not a crash or a meaningless chart.
+    return `<svg width="225" height="225" viewBox="0 0 225 225"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#e9ecef"/></svg>`;
+  }
+  let angleStart = -90; // 12 o'clock, matches conventional pie chart orientation
+  const paths = [];
+  slices.forEach((sl) => {
+    const fraction = sl.value / total;
+    const angleSweep = fraction * 360;
+    const angleEnd = angleStart + angleSweep;
+    if (sl.value > 0) {
+      if (fraction >= 0.9999) {
+        // A single slice covering the whole pie -- SVG arcs can't draw a
+        // full 360 degrees as one path (start and end point coincide,
+        // producing a degenerate/invisible path), so this needs its own
+        // case rather than falling through to the arc-path logic below.
+        paths.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${sl.color}"/>`);
+      } else {
+        const startRad = (angleStart * Math.PI) / 180;
+        const endRad = (angleEnd * Math.PI) / 180;
+        const x1 = cx + r * Math.cos(startRad);
+        const y1 = cy + r * Math.sin(startRad);
+        const x2 = cx + r * Math.cos(endRad);
+        const y2 = cy + r * Math.sin(endRad);
+        const largeArc = angleSweep > 180 ? 1 : 0;
+        paths.push(`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z" fill="${sl.color}"/>`);
+      }
+    }
+    angleStart = angleEnd;
+  });
+  return `<svg width="225" height="225" viewBox="0 0 225 225">${paths.join("")}</svg>`;
+}
+
+
+/**
+ * Executive Project Report -- a condensed, one-page-friendly summary for
+ * stakeholders. periodRange is either null (report on the entire project,
+ * no date filtering at all) or {start, end} ("YYYY-MM-DD" strings) for a
+ * custom window.
+ *
+ * "In scope" payment groups: for Entire Project, every group on this
+ * project. For a custom range, only groups with at least one payment
+ * whose date falls inside [start, end] -- matching "what stages had
+ * activity in this window", not an arbitrary date-only filter that could
+ * split a single disbursement's stages across different reports.
+ *
+ * Total Pending is deliberately NOT limited to the period's own payments
+ * -- it's a "what's still owed right now" figure (each group's real
+ * current balance), which wouldn't make sense computed from only a
+ * partial date slice.
+ */
+async function renderExecutiveProjectReport(project, payments, progressLogs, periodRange) {
+  const allGroups = getAllPaymentGroups(project.projectId);
+
+  const inRange = (dateStr) => {
+    if (!periodRange) return true;
+    const d = ymd(dateStr);
+    return d && d >= periodRange.start && d <= periodRange.end;
+  };
+
+  const inScopeGroups = periodRange
+    ? allGroups.filter((g) => g.stages.some((s) => inRange(s.paymentDate)))
+    : allGroups;
+
+  const totalInvoices = roundMoney(
+    inScopeGroups.reduce((sum, g) => sum + (Number(g.totalInvoice) || 0), 0),
+  );
+  const totalPaidOut = roundMoney(
+    inScopeGroups.reduce((sum, g) => {
+      const relevantStages = periodRange ? g.stages.filter((s) => inRange(s.paymentDate)) : g.stages;
+      return sum + relevantStages.reduce((s, st) => s + (Number(st.amount) || 0), 0);
+    }, 0),
+  );
+  const totalPending = roundMoney(
+    inScopeGroups.reduce((sum, g) => sum + Math.max(0, g.balance || 0), 0),
+  );
+
+  const periodLabel = periodRange
+    ? `${ymd(periodRange.start)} to ${ymd(periodRange.end)}`
+    : "Entire Project";
+
+  const periodPayments = periodRange
+    ? payments.filter((p) => p.projectId === project.projectId && inRange(p.paymentDate))
+    : payments.filter((p) => p.projectId === project.projectId);
+
+  const periodLogs = periodRange
+    ? progressLogs.filter((l) => inRange(l.dateRecorded))
+    : progressLogs;
+
+  const pieSlices = [
+    { label: "Total Invoices", value: Math.abs(totalInvoices), color: "#343a40" },
+    { label: "Total Paid Out", value: Math.abs(totalPaidOut), color: "#28a745" },
+    { label: "Total Pending", value: Math.abs(totalPending), color: "#fd7e14" },
+  ];
+
+  const paymentRowsHtml = periodPayments.length
+    ? periodPayments
+        .map(
+          (p) =>
+            `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(ymd(p.paymentDate))}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.payee || p.expenseCategory || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.paymentDirection || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:center;">${escapeHtml(displayPaymentStatus(p.status) || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(p.amount)}</td></tr>`,
+        )
+        .join("")
+    : `<tr><td colspan="5" style="padding:12px; text-align:center; color:#495057;">No payment activity in this period</td></tr>`;
+
+  // Vendor balances -- grouped by payee (groups don't carry a vendorId of
+  // their own, only individual payments might), summing each vendor's
+  // outstanding balance across their in-scope payment groups. Client
+  // Receipt groups excluded -- a client's outstanding balance isn't a
+  // vendor balance. Note: this means this table's total will NOT
+  // necessarily match the Total Pending snapshot figure above whenever a
+  // Client Receipt is itself pending -- that's intentional, not a bug:
+  // Total Pending is "money not yet settled in either direction", while
+  // this table is specifically "what we owe vendors".
+  const vendorBalances = {};
+  inScopeGroups
+    .filter((g) => g.direction !== "Client Receipt")
+    .forEach((g) => {
+      const key = g.payee || "Unknown";
+      vendorBalances[key] = roundMoney((vendorBalances[key] || 0) + Math.max(0, g.balance || 0));
+    });
+  const vendorBalanceRows = Object.entries(vendorBalances)
+    .filter(([, balance]) => balance > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const pendingPaymentRowsHtml = vendorBalanceRows.length
+    ? vendorBalanceRows
+        .map(
+          ([vendor, balance]) =>
+            `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(vendor)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(balance)}</td></tr>`,
+        )
+        .join("")
+    : `<tr><td colspan="2" style="padding:12px; text-align:center; color:#495057;">No outstanding vendor balances in this period</td></tr>`;
+
+  const progressRowsHtml = periodLogs.length
+    ? periodLogs
+        .map(
+          (l) =>
+            `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; white-space:nowrap;">${escapeHtml(ymd(l.dateRecorded))}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;"><strong>${escapeHtml(l.tradeCategory)}</strong></td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:center;">${escapeHtml(l.completionPercentage)}%</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(l.commentNarrative || "\u2014")}</td></tr>`,
+        )
+        .join("")
+    : `<tr><td colspan="4" style="padding:12px; text-align:center; color:#495057;">No progress logged in this period</td></tr>`;
+
+  return wrapReportPage(
+    `${await generateReportHeader("Executive Project Report", project)}
+    <div style="font-size:13px; font-weight:700; color:#495057; margin-bottom:16px;">Reporting Period: ${escapeHtml(periodLabel)}</div>
+    <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 16px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Project Snapshot</h3>
+    <div style="display:flex; gap:24px; align-items:center; flex-wrap:wrap; margin-bottom:20px;">
+      <div style="max-width: calc(420px - 30mm); margin: 0; flex: 1; min-width:220px;">
+        ${financialRowHTML("Total Invoices", totalInvoices, true, null, false)}
+        ${financialRowHTML("Total Paid Out", totalPaidOut, false, "var(--success)")}
+        ${financialRowHTML("Total Pending", totalPending, false, "#fd7e14")}
+      </div>
+      <div style="text-align:center;">
+        ${buildPieChartSvg(pieSlices)}
+      </div>
+    </div>
+    <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">This Period's Activity</h3>
+    <table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px; margin-bottom:20px;">
+      <thead><tr>
+        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Date</th>
+        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Payee / Category</th>
+        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Direction</th>
+        <th style="background:#000; color:#fff; text-align:center; padding:8px; font-size:10px; text-transform:uppercase;">Status</th>
+        <th style="background:#000; color:#fff; text-align:right; padding:8px; font-size:10px; text-transform:uppercase;">Amount</th>
+      </tr></thead>
+      <tbody>${paymentRowsHtml}</tbody>
+    </table>
+    <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Vendor Balances</h3>
+    <table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px; margin-bottom:20px;">
+      <thead><tr>
+        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Vendor</th>
+        <th style="background:#000; color:#fff; text-align:right; padding:8px; font-size:10px; text-transform:uppercase;">Balance</th>
+      </tr></thead>
+      <tbody>${pendingPaymentRowsHtml}</tbody>
+    </table>
+    <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Progress Log</h3>
+    <table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px;">
+      <thead><tr>
+        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Date</th>
+        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Trade</th>
+        <th style="background:#000; color:#fff; text-align:center; padding:8px; font-size:10px; text-transform:uppercase;">%</th>
+        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Notes</th>
+      </tr></thead>
+      <tbody>${progressRowsHtml}</tbody>
+    </table>
+    ${generateSignatureBlock()}`,
   );
 }
 
@@ -837,7 +1102,7 @@ async function renderFinancialVendor(vendor, projects, workorders, payments) {
   const payRows = vendorPayments
     .map((p) => {
       const proj = projects.find((pr) => pr.projectId === p.projectId);
-      return `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.paymentDate)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(proj ? proj.projectId : p.projectId)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.expenseCategory || "-")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">₦${moneyValue(p.amount)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:center;">${escapeHtml(p.status)}</td></tr>`;
+      return `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(ymd(p.paymentDate))}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(proj ? proj.projectId : p.projectId)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.expenseCategory || "-")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">₦${moneyValue(p.amount)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:center;">${escapeHtml(p.status)}</td></tr>`;
     })
     .join("");
   return wrapReportPage(
@@ -1085,7 +1350,7 @@ async function renderProgressReport(project, logs) {
   const rows = sorted
     .map(
       (l) =>
-        `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; vertical-align:top; white-space:nowrap;">${escapeHtml(l.dateRecorded)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; vertical-align:top; width:90px;"><strong>${escapeHtml(l.tradeCategory)}</strong></td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; vertical-align:top; width:100px;"><div style="background:#e9ecef; border-radius:4px; height:16px; width:100px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:8px;"><div style="background:#6c757d; height:100%; width:${Math.min(100, Math.max(0, Number(l.completionPercentage) || 0))}%;"></div></div><strong style="color:#6c757d;">${escapeHtml(l.completionPercentage)}%</strong></td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; vertical-align:top;">${escapeHtml(l.commentNarrative || "—")}</td></tr>`,
+        `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; vertical-align:top; white-space:nowrap;">${escapeHtml(ymd(l.dateRecorded))}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; vertical-align:top; width:90px;"><strong>${escapeHtml(l.tradeCategory)}</strong></td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; vertical-align:top; width:100px;"><div style="background:#e9ecef; border-radius:4px; height:16px; width:100px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:8px;"><div style="background:#6c757d; height:100%; width:${Math.min(100, Math.max(0, Number(l.completionPercentage) || 0))}%;"></div></div><strong style="color:#6c757d;">${escapeHtml(l.completionPercentage)}%</strong></td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; vertical-align:top;">${escapeHtml(l.commentNarrative || "—")}</td></tr>`,
     )
     .join("");
   return wrapReportPage(
@@ -1321,6 +1586,32 @@ async function compileFieldReport(btn) {
         return;
       }
       html = await renderFinancialProject(project, cache.payments || []);
+    } else if (type === "executive_project") {
+      const project = (cache.projects || []).find(
+        (p) => p.projectId === filter,
+      );
+      if (!project) {
+        alert("Project not found");
+        return;
+      }
+      const periodMode = document.getElementById("rep-period-mode")
+        ? document.getElementById("rep-period-mode").value
+        : "entire";
+      const periodRange =
+        periodMode === "range"
+          ? {
+              start: document.getElementById("rep-period-start")?.value || "",
+              end: document.getElementById("rep-period-end")?.value || "",
+            }
+          : null;
+      if (periodMode === "range" && (!periodRange.start || !periodRange.end)) {
+        alert("Select both a start and end date, or switch to Entire Project");
+        return;
+      }
+      const projectLogs = (cache.progressLogs || []).filter(
+        (l) => l.projectId === filter,
+      );
+      html = await renderExecutiveProjectReport(project, cache.payments || [], projectLogs, periodRange);
     } else if (type === "financial_client") {
       html = await renderFinancialClient(
         filter,
@@ -1535,7 +1826,7 @@ async function renderPcrReport(project, changeOrders, payments, mode) {
   // Core rows always shown
   const finRows = [
     { label: "Contract Value", value: moneyValue(totalContract), bold: false },
-    { label: "Client Receipts", value: moneyValue(totalReceived), bold: false },
+    { label: "Client Funds Received", value: moneyValue(totalReceived), bold: false },
     {
       label: "Balance Expected",
       value: moneyValue(balanceExpected),

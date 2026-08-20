@@ -601,7 +601,15 @@ async function openModal(type, editData = null) {
     const uniqueId = isEdit ? editData.vendorId : "VND-" + Date.now();
     title.innerText = isEdit ? "Edit Vendor" : "New Vendor";
     if (isEdit) {
-      currentAvatarPhoto = editData.passport;
+      // The passport column is a single image, but the backend stores it
+      // in a jsonb column defaulting to [] (an empty-array default meant
+      // for list-shaped fields like attachments, not a single image) --
+      // so a vendor with no photo comes back as [] rather than "" or
+      // null. [] is truthy, so the .startsWith() check below used to
+      // reach a real string method call on an array and crash instantly,
+      // before the modal could even open. Coercing defensively here means
+      // this can't crash regardless of what shape the database sends.
+      currentAvatarPhoto = typeof editData.passport === "string" ? editData.passport : "";
       if (editData.attachments)
         currentModalFiles = splitAttachments(editData.attachments);
     }
@@ -694,6 +702,53 @@ async function openModal(type, editData = null) {
         .then(() => {
           closeModal();
           refreshVendorsListView();
+        })
+        .catch(resetSubmitOnError(submit));
+    };
+  } else if (type === "progress_entry") {
+    // This branch was entirely missing -- openModalWithRecord('progress_entry', ...)
+    // had nothing to match against, so body.innerHTML never got set at
+    // all, while the Save button (built by shared, type-independent code
+    // further down) still appeared -- exactly "form not opening fully,
+    // only shows the Save button".
+    //
+    // isEdit alone (!!editData) isn't enough here: creating a new
+    // sub-task passes a minimal editData object (just to carry
+    // parentLogId/projectId through), which would otherwise make the
+    // global isEdit true and incorrectly show an "edit" form with mostly
+    // blank fields instead of a genuine new-entry form.
+    const isNewSubTask = isEdit && editData._isSubTask === true;
+    const isEditingLog = isEdit && !isNewSubTask;
+    const parentLogId = isEdit ? editData.parentLogId : undefined;
+
+    title.innerText = isEditingLog ? "Edit Progress Entry" : isNewSubTask ? "Add Sub-task" : "Log Progress";
+    body.innerHTML = `<label ${labelStyle}>Trade Category</label><input id="pl_trade" value="${escapeAttr(isEditingLog ? editData.tradeCategory || "" : "")}" ${largeInput}><label ${labelStyle}>Completion (%)</label><input id="pl_percent" type="number" min="0" max="100" value="${escapeAttr(isEditingLog && editData.completionPercentage != null ? editData.completionPercentage : "")}" ${largeInput}><label ${labelStyle}>Comments</label><textarea id="pl_comment" rows="4" ${largeInput}>${escapeHtml(isEditingLog ? editData.commentNarrative || "" : "")}</textarea><div id="progressPhotoPreviews" class="modal-preview-grid" style="display:none;"></div><label class="icon-upload-label"><i class="fas fa-camera"></i><input type="file" id="pl_photo" accept="image/*" multiple style="display:none"></label>`;
+    if (isEditingLog && editData.progressPhotoUrl)
+      currentModalFiles = splitAttachments(editData.progressPhotoUrl);
+
+    submit.style.display = "block";
+    submit.innerText = "Save";
+    submit.onclick = () => {
+      const tradeCategory = document.getElementById("pl_trade").value.trim();
+      if (!tradeCategory) {
+        alert("Enter a trade category");
+        return;
+      }
+      submit.disabled = true;
+      submit.innerText = "Saving...";
+      const payload = {
+        logId: isEditingLog ? editData.logId : undefined,
+        projectId: isEditingLog ? editData.projectId : isNewSubTask ? editData.projectId : getCurrentProjectId(),
+        tradeCategory,
+        completionPercentage: document.getElementById("pl_percent").value,
+        commentNarrative: document.getElementById("pl_comment").value,
+        progressPhotoUrl: normalizeAttachments(currentModalFiles),
+        parentLogId: parentLogId,
+      };
+      callApi(isEditingLog ? "updateProgressLog" : "saveProgressLog", payload)
+        .then(() => {
+          closeModal();
+          if (typeof loadProgressTimelineFeed === "function") loadProgressTimelineFeed(true);
         })
         .catch(resetSubmitOnError(submit));
     };

@@ -254,17 +254,38 @@ function switchConsoleSegment(seg) {
     initDocumentsPage(getCurrentProjectId());
 }
 
+/**
+ * A top-level progress log's displayed percentage is either its own
+ * entered value, or -- once it has sub-tasks -- the average of those
+ * sub-tasks' percentages instead. Shared by both the overall project
+ * completion calculation and the card rendering, so they can never
+ * disagree with each other.
+ */
+function computeLogDisplayPercentage(log, allLogs) {
+  const children = allLogs.filter((l) => l.parentLogId === log.logId);
+  if (!children.length) return Number(log.completionPercentage) || 0;
+  const total = children.reduce((sum, c) => sum + (Number(c.completionPercentage) || 0), 0);
+  return Math.round(total / children.length);
+}
+
 function getProjectProgressCompletion(projectId = getCurrentProjectId()) {
   const cache = getCache();
   const projectLogs = (cache.progressLogs || []).filter(
     (l) => l.projectId === projectId,
   );
   if (!projectLogs.length) return 0;
-  const total = projectLogs.reduce(
-    (sum, log) => sum + (Number(log.completionPercentage) || 0),
+  // Only top-level logs count toward the overall figure -- a sub-log's
+  // own percentage is already folded into its parent's displayed value
+  // above, so including it again here would double-count that trade and
+  // unfairly weight any trade that's been broken into sub-tasks versus
+  // one that hasn't.
+  const topLevelLogs = projectLogs.filter((l) => !l.parentLogId);
+  if (!topLevelLogs.length) return 0;
+  const total = topLevelLogs.reduce(
+    (sum, log) => sum + computeLogDisplayPercentage(log, projectLogs),
     0,
   );
-  return Math.round(total / projectLogs.length);
+  return Math.round(total / topLevelLogs.length);
 }
 
 function setPcrStatusMessage(message, type = "info") {
@@ -987,31 +1008,61 @@ async function loadProgressTimelineFeed(forceRefresh = false) {
     return db - da;
   });
 
+  const topLevelLogs = projectLogs.filter((l) => !l.parentLogId);
+  const childrenByParent = {};
+  projectLogs.forEach((l) => {
+    if (l.parentLogId) {
+      childrenByParent[l.parentLogId] = childrenByParent[l.parentLogId] || [];
+      childrenByParent[l.parentLogId].push(l);
+    }
+  });
+
+  function subLogCardHtml(l) {
+    const key = `progress:${l.logId}`;
+    window.modalRecordCache = window.modalRecordCache || {};
+    window.modalRecordCache[key] = l;
+    const pct = Number(l.completionPercentage) || 0;
+    const color = pct >= 90 ? "var(--success)" : pct >= 50 ? "#fd7e14" : "var(--primary)";
+    return `<div class="card" style="border-left:6px solid ${color}; cursor:pointer; margin-left:24px; margin-top:8px;" onclick="window.openModalWithRecord('progress_entry', window.modalRecordCache['${key}'])">
+      <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(l.tradeCategory)}</div>
+          <div style="font-size:12px; color:var(--muted); margin-top:2px;">${escapeHtml(typeof ymd === "function" ? ymd(l.dateRecorded) : String(l.dateRecorded || "").slice(0, 10))}</div>
+        </div>
+        <span style="font-size:18px; font-weight:900; color:${color}; flex-shrink:0;">${pct}%</span>
+      </div>
+      ${l.commentNarrative ? `<div style="margin-top:6px; font-size:13px; line-height:1.4;">${escapeHtml(l.commentNarrative).substring(0, 120)}${l.commentNarrative.length > 120 ? "..." : ""}</div>` : ""}
+      ${(Array.isArray(l.progressPhotoUrl) ? l.progressPhotoUrl.length > 0 : !!String(l.progressPhotoUrl || "").trim()) ? `<div style="margin-top:8px; font-size:11px; color:var(--muted);"><i class="fas fa-paperclip"></i> Has attachments</div>` : ""}
+    </div>`;
+  }
+
   container.innerHTML =
     `<div class="console-cards-grid">` +
-    projectLogs
+    topLevelLogs
       .map((l) => {
         const key = `progress:${l.logId}`;
         window.modalRecordCache = window.modalRecordCache || {};
         window.modalRecordCache[key] = l;
-        const pct = Number(l.completionPercentage) || 0;
+        const pct = computeLogDisplayPercentage(l, projectLogs);
         const color =
           pct >= 90
             ? "var(--success)"
             : pct >= 50
               ? "#fd7e14"
               : "var(--primary)";
+        const children = childrenByParent[l.logId] || [];
         return `<div class="card" style="border-left:6px solid ${color}; cursor:pointer;" onclick="window.openModalWithRecord('progress_entry', window.modalRecordCache['${key}'])">
         <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
           <div style="flex:1; min-width:0;">
             <div style="font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(l.tradeCategory)}</div>
-            <div style="font-size:12px; color:var(--muted); margin-top:2px;">${escapeHtml(l.dateRecorded)}</div>
+            <div style="font-size:12px; color:var(--muted); margin-top:2px;">${escapeHtml(typeof ymd === "function" ? ymd(l.dateRecorded) : String(l.dateRecorded || "").slice(0, 10))}</div>
           </div>
-          <span style="font-size:18px; font-weight:900; color:${color}; flex-shrink:0;">${pct}%</span>
+          <span style="font-size:18px; font-weight:900; color:${color}; flex-shrink:0;">${pct}%${children.length ? ` <span style="font-size:11px; font-weight:600; color:var(--muted);">(avg of ${children.length})</span>` : ""}</span>
         </div>
         ${l.commentNarrative ? `<div style="margin-top:6px; font-size:13px; line-height:1.4;">${escapeHtml(l.commentNarrative).substring(0, 120)}${l.commentNarrative.length > 120 ? "..." : ""}</div>` : ""}
-        ${l.progressPhotoUrl ? `<div style="margin-top:8px; font-size:11px; color:var(--muted);"><i class="fas fa-paperclip"></i> Has attachments</div>` : ""}
-      </div>`;
+        ${(Array.isArray(l.progressPhotoUrl) ? l.progressPhotoUrl.length > 0 : !!String(l.progressPhotoUrl || "").trim()) ? `<div style="margin-top:8px; font-size:11px; color:var(--muted);"><i class="fas fa-paperclip"></i> Has attachments</div>` : ""}
+        <button class="action-btn" style="width:auto; padding:4px 12px; font-size:11px; margin-top:8px; background:var(--card-light); color:var(--text);" onclick="event.stopPropagation(); window.openModalWithRecord('progress_entry', {_isSubTask:true, projectId:'${l.projectId}', parentLogId:'${l.logId}'})"><i class="fas fa-plus"></i> Add Sub-task</button>
+      </div>` + children.map(subLogCardHtml).join("");
       })
       .join("") +
     `</div>`;

@@ -229,7 +229,11 @@ function renderVendors() {
   // photos, documents, attachment previews). Resolve each one properly and
   // swap in the real thumbnail once it arrives.
   filtered.forEach((v) => {
-    if (!v.passport) return;
+    // Same jsonb-array-default issue as the edit modal: a vendor with no
+    // photo has passport = [] (truthy, so the old `if (!v.passport)`
+    // guard let it straight through), not "" or null -- crashing the
+    // moment resolveImageToDataUrl tried a string method on an array.
+    if (typeof v.passport !== "string" || !v.passport) return;
     resolveImageToDataUrl(v.passport).then((resolved) => {
       if (!resolved) return;
       const img = document.getElementById(`vendor-avatar-${v.vendorId}`);
