@@ -973,14 +973,26 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
         .join("")
     : `<tr><td colspan="2" style="padding:12px; text-align:center; color:#495057;">No outstanding vendor balances in this period</td></tr>`;
 
-  const progressRowsHtml = periodLogs.length
-    ? periodLogs
-        .map(
-          (l) =>
-            `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; white-space:nowrap;">${escapeHtml(ymd(l.dateRecorded))}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;"><strong>${escapeHtml(l.tradeCategory)}</strong></td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:center;">${escapeHtml(l.completionPercentage)}%</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(l.commentNarrative || "\u2014")}</td></tr>`,
-        )
+  // Main logs only -- a sub-log's own percentage is already folded into
+  // its parent's calculated figure (see computeLogDisplayPercentage,
+  // shared with console.js), so listing both here would be redundant
+  // and double-count the same work.
+  const mainPeriodLogs = periodLogs.filter((l) => !l.parentLogId);
+  const overallProjectPercent =
+    typeof getProjectProgressCompletion === "function"
+      ? getProjectProgressCompletion(project.projectId)
+      : 0;
+  const progressRowsHtml = mainPeriodLogs.length
+    ? mainPeriodLogs
+        .map((l) => {
+          const calcPercent =
+            typeof computeLogDisplayPercentage === "function"
+              ? computeLogDisplayPercentage(l, progressLogs)
+              : Number(l.completionPercentage) || 0;
+          return `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;"><strong>${escapeHtml(l.tradeCategory)}</strong></td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:center;">${calcPercent.toFixed(1)}%</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(l.commentNarrative || "\u2014")}</td></tr>`;
+        })
         .join("")
-    : `<tr><td colspan="4" style="padding:12px; text-align:center; color:#495057;">No progress logged in this period</td></tr>`;
+    : `<tr><td colspan="3" style="padding:12px; text-align:center; color:#495057;">No progress logged in this period</td></tr>`;
 
   return wrapReportPage(
     `${await generateReportHeader("Executive Project Report", project)}
@@ -1015,17 +1027,15 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
       </tr></thead>
       <tbody>${pendingPaymentRowsHtml}</tbody>
     </table>
-    <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Progress Log</h3>
+    <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px; display:flex; justify-content:space-between; align-items:baseline;"><span>Progress Log</span><span style="font-size:16px;">${overallProjectPercent.toFixed(1)}% Overall</span></h3>
     <table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px;">
       <thead><tr>
-        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Date</th>
         <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Trade</th>
         <th style="background:#000; color:#fff; text-align:center; padding:8px; font-size:10px; text-transform:uppercase;">%</th>
         <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Notes</th>
       </tr></thead>
       <tbody>${progressRowsHtml}</tbody>
-    </table>
-    ${generateSignatureBlock()}`,
+    </table>`,
   );
 }
 

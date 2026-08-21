@@ -236,18 +236,21 @@ window.taskClearSelection = taskClearSelection;
  * the Dashboard's quick-add FAB, both use this same path).
  * Returns { createdCount, failCount }.
  */
-async function createTasksFromTitles(rawValue) {
+async function createTasksFromTitles(rawValue, overrideProjectId) {
   const titles = String(rawValue || "").split(";").map((t) => t.trim()).filter(Boolean);
   if (!titles.length) return { createdCount: 0, failCount: 0 };
 
+  // The backend requires projectId on every saveTask call.
+  const currentProjectId =
+    overrideProjectId || (typeof getCurrentProjectId === "function" ? getCurrentProjectId() : "");
   const results = await Promise.allSettled(
-    titles.map((title) => callApi("saveTask", { title: title, status: "Open" }))
+    titles.map((title) => callApi("saveTask", { title: title, status: "Open", projectId: currentProjectId }))
   );
   const cache = getCache();
   let failCount = 0;
   results.forEach((result, i) => {
     if (result.status === "fulfilled") {
-      tasksList.push({ taskId: (result.value && result.value.taskId) || ("TASK-" + Date.now() + "-" + i), title: titles[i], notes: "", projectId: "", status: "Open", groupId: "", sortOrder: Date.now() + i, lastModified: Date.now() + i });
+      tasksList.push({ taskId: (result.value && result.value.taskId) || ("TASK-" + Date.now() + "-" + i), title: titles[i], notes: "", projectId: currentProjectId, status: "Open", groupId: "", sortOrder: Date.now() + i, lastModified: Date.now() + i });
     } else {
       failCount++;
       console.error("Could not add task:", titles[i], result.reason);
@@ -258,6 +261,64 @@ async function createTasksFromTitles(rawValue) {
   return { createdCount: titles.length - failCount, failCount: failCount };
 }
 window.createTasksFromTitles = createTasksFromTitles;
+
+/**
+ * The general/all-tasks view has no "current project" context at all --
+ * getCurrentProjectId() correctly returns empty there, since there
+ * genuinely isn't one. Every task still requires a project on the
+ * backend, so this asks for one instead of silently sending an empty
+ * value that would just fail with "projectId is required".
+ * Self-contained inline styles, same reliable pattern as the undo
+ * toast -- not dependent on external CSS that may be missing.
+ */
+function promptForProjectId() {
+  return new Promise((resolve) => {
+    const cache = getCache();
+    const projects = (cache.projects || []).filter((p) => String(p.archived).toLowerCase() !== "yes" && p.archived !== true);
+    if (!projects.length) {
+      alert("No projects available to assign this task to.");
+      resolve(null);
+      return;
+    }
+    const overlay = document.createElement("div");
+    overlay.style.cssText =
+      "position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:8000;";
+    const box = document.createElement("div");
+    box.style.cssText =
+      "background:#fff;border-radius:16px;padding:20px;max-width:320px;width:90%;box-shadow:0 8px 24px rgba(0,0,0,0.3);";
+    const label = document.createElement("div");
+    label.textContent = "Which project is this task for?";
+    label.style.cssText = "font-weight:800;font-size:15px;margin-bottom:12px;";
+    const select = document.createElement("select");
+    select.style.cssText = "width:100%;padding:12px;font-size:16px;border-radius:10px;border:1.5px solid #ddd;margin-bottom:14px;";
+    projects.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p.projectId;
+      opt.textContent = p.displayNumber || p.projectId;
+      select.appendChild(opt);
+    });
+    const btnRow = document.createElement("div");
+    btnRow.style.cssText = "display:flex;gap:10px;";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.className = "action-btn";
+    cancelBtn.style.cssText = "flex:1;background:var(--card-light);color:var(--text);";
+    const confirmBtn = document.createElement("button");
+    confirmBtn.textContent = "Add Task";
+    confirmBtn.className = "action-btn";
+    confirmBtn.style.cssText = "flex:1;";
+    cancelBtn.onclick = () => { overlay.remove(); resolve(null); };
+    confirmBtn.onclick = () => { overlay.remove(); resolve(select.value); };
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    box.appendChild(label);
+    box.appendChild(select);
+    box.appendChild(btnRow);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}
+window.promptForProjectId = promptForProjectId;
 
 async function taskQuickAdd() {
   const input = document.getElementById("task-quick-add-input");
@@ -270,14 +331,22 @@ async function taskQuickAdd() {
     setTimeout(() => { input.style.boxShadow = ""; }, 400);
     return;
   }
+  let overrideProjectId;
+  const hasCurrentProject = typeof getCurrentProjectId === "function" && getCurrentProjectId();
+  if (!hasCurrentProject) {
+    overrideProjectId = await promptForProjectId();
+    if (!overrideProjectId) return; // cancelled
+  }
   input.disabled = true;
   try {
-    const { failCount } = await createTasksFromTitles(rawValue);
+    const { failCount } = await createTasksFromTitles(rawValue, overrideProjectId);
     renderTasksPage();
     if (failCount > 0) {
       const total = rawValue.split(";").filter((t) => t.trim()).length;
       alert(failCount + " of " + total + " tasks could not be saved — check your connection and try again for those.");
     }
+    input.value = "";
+    input.disabled = false;
   } catch (e) {
     alert("Could not add tasks: " + (e.message || "Unknown error"));
     input.disabled = false;
@@ -467,10 +536,32 @@ function deleteTaskWithUndo(task) {
   cache1.tasks = tasksList;
   setCache(cache1);
   renderTasksPage();
+  const isUnsyncedLocal = String(task.taskId || "").startsWith("temp_");
   scheduleUndoableDelete(
     "task:" + task.taskId,
     "Task deleted",
-    function () {
+    async function () {
+      if (isUnsyncedLocal) {
+        // This task was created offline and never actually made it to the
+        // server (its own create is presumably still queued, or failed) --
+        // there's nothing there to delete. Sending a real deleteTask for
+        // a temp_ id just produces "invalid input syntax for type uuid"
+        // every time, forever. Instead, cancel whatever's still queued
+        // for it (its create, or any edit), so it can't sync in later and
+        // resurrect something the user already deleted.
+        if (typeof getQueuedRequestsForCurrentAccount === "function" && typeof deleteQueuedRequest === "function") {
+          try {
+            const queue = await getQueuedRequestsForCurrentAccount();
+            const related = queue.filter((item) => item.data && item.data.taskId === task.taskId);
+            for (const item of related) {
+              await deleteQueuedRequest(item.id);
+            }
+          } catch (e) {
+            console.error("Could not cancel queued request for unsynced task", e);
+          }
+        }
+        return;
+      }
       callApi("deleteTask", { taskId: task.taskId }).catch(function (e) {
         console.error("Delete failed after undo window expired", e);
       });

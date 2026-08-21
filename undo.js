@@ -22,12 +22,35 @@ function scheduleUndoableDelete(id, message, onCommit, onUndo) {
   if (undoActiveTimers[id]) return;
 
   const toast = document.createElement("div");
-  toast.className = "undo-toast";
-  toast.innerHTML =
-    '<span>' + escapeHtml(message) + '</span>' +
-    '<button class="undo-toast-btn" onclick="window.triggerUndo(\'' + escapeAttr(id) + '\')">Undo</button>';
+  // Inline styles instead of relying on external .undo-toast CSS classes
+  // -- this was likely the actual cause of "no confirmation shows": the
+  // element was being created and appended correctly, but with no
+  // guaranteed visible styling (position, z-index, colors, animation) if
+  // that CSS was ever missing or incomplete, it would sit in the DOM
+  // invisibly. Matches showSyncToast's already-reliable, self-contained
+  // approach, just styled distinctly enough (dark red) to read as a
+  // delete confirmation rather than a generic sync message.
+  toast.style.cssText =
+    "position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);" +
+    "background:#1a1a1a;color:#fff;padding:12px 16px;border-radius:14px;" +
+    "font-size:14px;font-weight:700;z-index:7500;max-width:90%;" +
+    "display:flex;align-items:center;gap:14px;box-shadow:0 4px 16px rgba(0,0,0,0.35);" +
+    "opacity:0;transition:opacity 0.25s, transform 0.25s;";
+  const messageSpan = document.createElement("span");
+  messageSpan.textContent = message;
+  const undoBtn = document.createElement("button");
+  undoBtn.textContent = "Undo";
+  undoBtn.style.cssText =
+    "background:none;border:none;color:#4dabf7;font-weight:800;font-size:14px;" +
+    "cursor:pointer;padding:4px 8px;flex-shrink:0;";
+  undoBtn.onclick = () => window.triggerUndo(id);
+  toast.appendChild(messageSpan);
+  toast.appendChild(undoBtn);
   document.body.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add("undo-toast-visible"));
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "translateX(-50%) translateY(0)";
+  });
 
   const timerId = setTimeout(() => {
     delete undoActiveTimers[id];

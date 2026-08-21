@@ -354,6 +354,7 @@ function calculateConcrete() {
   let grandBindingWireKg = 0;
   let grandFormworkArea = 0;
   let grandNailsKg = 0;
+  let grandVolume = 0;
   const elementLines = [];
   let anyEntered = false;
 
@@ -422,6 +423,7 @@ function calculateConcrete() {
     formworkArea *= qty;
     bindingWireKg *= qty;
     nailsKg *= qty;
+    const elementTotalVolume = wetVolume * qty;
 
     grandCementBags += cementBags;
     grandSandTons += sandTons;
@@ -430,10 +432,11 @@ function calculateConcrete() {
     grandBindingWireKg += bindingWireKg;
     grandFormworkArea += formworkArea;
     grandNailsKg += nailsKg;
+    grandVolume += elementTotalVolume;
 
     const rebarLabel = rebarChoice === "none" ? "none" : rebarChoice;
     elementLines.push(
-      `  ${name}${qty > 1 ? ` (×${qty})` : ""}: ${dimensionLabel}, mix ${mix}, rebar ${rebarLabel} → ${fmtNum(Math.ceil(cementBags), 0)} bags, ${fmtNum(sandTons, 2)}t sand, ${fmtNum(aggregateTons, 2)}t granite${rebarChoice !== "none" ? `, ${fmtNum(rebarKg, 1)}kg rebar` : ""}`,
+      `  ${name}${qty > 1 ? ` (×${qty})` : ""}: ${dimensionLabel}, mix ${mix}, rebar ${rebarLabel} → ${fmtNum(elementTotalVolume, 3)}m³, ${fmtNum(Math.ceil(cementBags), 0)} bags, ${fmtNum(sandTons, 2)}t sand, ${fmtNum(aggregateTons, 2)}t granite${rebarChoice !== "none" ? `, ${fmtNum(rebarKg, 1)}kg rebar` : ""}`,
     );
   });
 
@@ -449,6 +452,7 @@ function calculateConcrete() {
     ...elementLines,
     "",
     "-- Totals (all elements) --",
+    `Total Volume: ${fmtNum(grandVolume, 3)} m³`,
     `Cement: ${fmtNum(Math.ceil(grandCementBags), 0)} bags (${c.general.cementBagWeightKg}kg)`,
     `Sand: ${fmtNum(grandSandTons, 2)} tons`,
     `Aggregate (Granite): ${fmtNum(grandAggregateTons, 2)} tons`,
@@ -515,6 +519,7 @@ function calculateBlockwork() {
   let grandBlocks = 0;
   let grandCementBags = 0;
   let grandSandTons = 0;
+  let grandSurfaceArea = 0;
   const elementLines = [];
   let anyEntered = false;
 
@@ -548,9 +553,10 @@ function calculateBlockwork() {
     grandBlocks += blocksNeeded;
     grandCementBags += cementBags;
     grandSandTons += sandTons;
+    grandSurfaceArea += netArea;
 
     elementLines.push(
-      `  ${name}: ${fmtNum(L)}m x ${fmtNum(H)}m, ${type}" block${openings > 0 ? `, ${fmtNum(openings, 2)}m² openings deducted` : ""} → ${fmtNum(blocksNeeded, 0)} blocks, ${fmtNum(Math.ceil(cementBags), 0)} bags cement, ${fmtNum(sandTons, 2)}t sand`,
+      `  ${name}: ${fmtNum(L)}m x ${fmtNum(H)}m, ${type}" block${openings > 0 ? `, ${fmtNum(openings, 2)}m² openings deducted` : ""} → ${fmtNum(netArea, 2)}m² surface, ${fmtNum(blocksNeeded, 0)} blocks, ${fmtNum(Math.ceil(cementBags), 0)} bags cement, ${fmtNum(sandTons, 2)}t sand`,
     );
   });
 
@@ -566,6 +572,7 @@ function calculateBlockwork() {
     ...elementLines,
     "",
     "-- Totals (all walls) --",
+    `Total Surface Area: ${fmtNum(grandSurfaceArea, 2)} m²`,
     `Blocks Required: ${fmtNum(grandBlocks, 0)} pcs`,
     `Mortar Cement: ${fmtNum(Math.ceil(grandCementBags), 0)} bags (${c.general.cementBagWeightKg}kg)`,
     `Mortar Sand: ${fmtNum(grandSandTons, 2)} tons`,

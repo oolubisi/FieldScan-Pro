@@ -265,7 +265,7 @@ function computeLogDisplayPercentage(log, allLogs) {
   const children = allLogs.filter((l) => l.parentLogId === log.logId);
   if (!children.length) return Number(log.completionPercentage) || 0;
   const total = children.reduce((sum, c) => sum + (Number(c.completionPercentage) || 0), 0);
-  return Math.round(total / children.length);
+  return Math.round((total / children.length) * 10) / 10; // 1 decimal place
 }
 
 function getProjectProgressCompletion(projectId = getCurrentProjectId()) {
@@ -285,7 +285,7 @@ function getProjectProgressCompletion(projectId = getCurrentProjectId()) {
     (sum, log) => sum + computeLogDisplayPercentage(log, projectLogs),
     0,
   );
-  return Math.round(total / topLevelLogs.length);
+  return Math.round((total / topLevelLogs.length) * 10) / 10; // 1 decimal place
 }
 
 function setPcrStatusMessage(message, type = "info") {
@@ -427,14 +427,20 @@ window.previewPcrReport = previewPcrReport;
 
 // Add delete function for progress logs
 async function deleteProgressLog(logId) {
-  if (!confirm("Delete this progress log?")) return;
+  const cache = getCache();
+  const childCount = (cache.progressLogs || []).filter((l) => l.parentLogId === logId).length;
+  const warning = childCount
+    ? `Delete this progress log? This will also delete its ${childCount} sub-task${childCount > 1 ? "s" : ""}.`
+    : "Delete this progress log?";
+  if (!confirm(warning)) return;
   try {
     await callApi("deleteProgressLog", { logId });
-    const cache = getCache();
-    cache.progressLogs = (cache.progressLogs || []).filter(
-      (l) => l.logId !== logId,
+    const freshCache = getCache();
+    freshCache.progressLogs = (freshCache.progressLogs || []).filter(
+      (l) => l.logId !== logId && l.parentLogId !== logId,
     );
-    setCache(cache);
+    setCache(freshCache);
+    if (typeof closeModal === "function") closeModal();
     loadProgressTimelineFeed(true);
     showSyncToast("✅ Progress log deleted");
   } catch (e) {
@@ -991,7 +997,7 @@ async function loadProgressTimelineFeed(forceRefresh = false) {
 
   const overallEl = document.getElementById("console-progress-overall");
   if (overallEl)
-    overallEl.innerText = getProjectProgressCompletion(projectId) + "%";
+    overallEl.innerText = getProjectProgressCompletion(projectId).toFixed(1) + "%";
 
   // Update PCR fields if on PCR tab
   if (typeof updatePcrFields === "function") updatePcrFields();
@@ -1023,7 +1029,13 @@ async function loadProgressTimelineFeed(forceRefresh = false) {
     window.modalRecordCache[key] = l;
     const pct = Number(l.completionPercentage) || 0;
     const color = pct >= 90 ? "var(--success)" : pct >= 50 ? "#fd7e14" : "var(--primary)";
-    return `<div class="card" style="border-left:6px solid ${color}; cursor:pointer; margin-left:24px; margin-top:8px;" onclick="window.openModalWithRecord('progress_entry', window.modalRecordCache['${key}'])">
+    // Sits inside the parent's connector strip (see below) -- the strip's
+    // own left border IS the vertical "spine" of the tree connector, so
+    // this card only needs to sit indented within it, not draw its own
+    // line. A small top-left notch (border-radius reset on that corner)
+    // is what makes it read as "branching off" the spine rather than
+    // just another independent card floating nearby.
+    return `<div class="card" style="border-left:6px solid ${color}; border-top-left-radius:0; cursor:pointer; margin-top:8px;" onclick="window.openModalWithRecord('progress_entry', window.modalRecordCache['${key}'])">
       <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
         <div style="flex:1; min-width:0;">
           <div style="font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(l.tradeCategory)}</div>
@@ -1051,18 +1063,31 @@ async function loadProgressTimelineFeed(forceRefresh = false) {
               ? "#fd7e14"
               : "var(--primary)";
         const children = childrenByParent[l.logId] || [];
-        return `<div class="card" style="border-left:6px solid ${color}; cursor:pointer;" onclick="window.openModalWithRecord('progress_entry', window.modalRecordCache['${key}'])">
+        const parentCardHtml = `<div class="card" style="border-left:6px solid ${color}; cursor:pointer;" onclick="window.openModalWithRecord('progress_entry', window.modalRecordCache['${key}'])">
         <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
           <div style="flex:1; min-width:0;">
             <div style="font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(l.tradeCategory)}</div>
             <div style="font-size:12px; color:var(--muted); margin-top:2px;">${escapeHtml(typeof ymd === "function" ? ymd(l.dateRecorded) : String(l.dateRecorded || "").slice(0, 10))}</div>
           </div>
-          <span style="font-size:18px; font-weight:900; color:${color}; flex-shrink:0;">${pct}%${children.length ? ` <span style="font-size:11px; font-weight:600; color:var(--muted);">(avg of ${children.length})</span>` : ""}</span>
+          <span style="font-size:18px; font-weight:900; color:${color}; flex-shrink:0;">${pct.toFixed(1)}%${children.length ? ` <span style="font-size:11px; font-weight:600; color:var(--muted);">(avg of ${children.length})</span>` : ""}</span>
         </div>
         ${l.commentNarrative ? `<div style="margin-top:6px; font-size:13px; line-height:1.4;">${escapeHtml(l.commentNarrative).substring(0, 120)}${l.commentNarrative.length > 120 ? "..." : ""}</div>` : ""}
         ${(Array.isArray(l.progressPhotoUrl) ? l.progressPhotoUrl.length > 0 : !!String(l.progressPhotoUrl || "").trim()) ? `<div style="margin-top:8px; font-size:11px; color:var(--muted);"><i class="fas fa-paperclip"></i> Has attachments</div>` : ""}
         <button class="action-btn" style="width:auto; padding:4px 12px; font-size:11px; margin-top:8px; background:var(--card-light); color:var(--text);" onclick="event.stopPropagation(); window.openModalWithRecord('progress_entry', {_isSubTask:true, projectId:'${l.projectId}', parentLogId:'${l.logId}'})"><i class="fas fa-plus"></i> Add Sub-task</button>
-      </div>` + children.map(subLogCardHtml).join("");
+      </div>`;
+        // The whole group (parent + its sub-logs) is wrapped in ONE outer
+        // div, which is what actually becomes the single grid cell --
+        // without this wrapper, each sub-log card would just flow as its
+        // own independent grid item (possibly in a totally different row
+        // or column), with no visual relationship to its parent at all.
+        // The connector itself is just a continuous left border running
+        // down a padded strip containing all the sub-logs -- the
+        // straightforward, reliable way to draw a persistent "spine"
+        // line without needing separate positioned elements per card.
+        const childrenHtml = children.length
+          ? `<div style="margin-left:20px; padding-left:16px; border-left:2px solid var(--border); margin-top:8px;">${children.map(subLogCardHtml).join("")}</div>`
+          : "";
+        return `<div>${parentCardHtml}${childrenHtml}</div>`;
       })
       .join("") +
     `</div>`;
