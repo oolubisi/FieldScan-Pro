@@ -73,6 +73,14 @@ function closeMobileMoreSheet() {
 window.closeMobileMoreSheet = closeMobileMoreSheet;
 
 // ===== PROGRESS LOG UPDATE =====
+// NOTE (codebase health check): appears to have zero call sites across
+// every frontend file reviewed -- likely superseded by modals.js's
+// progress_entry branch, which calls callApi("updateProgressLog", ...)
+// directly rather than through this wrapper. Also misplaced here
+// regardless (app.js is otherwise navigation/shell/Electron-notification
+// code; every other Progress Log function lives in console.js). Left
+// in place rather than removed, since index.html wasn't available to
+// fully confirm nothing still references it via an onclick handler.
 async function updateProgressLog(logId, data) {
   try {
     const payload = {

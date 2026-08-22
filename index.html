@@ -26,7 +26,14 @@
           <button class="home-btn" onclick="showPage('dashboard')">
             <i class="fas fa-home"></i>
           </button>
-          <h2 id="sidebar-company-name" onclick="window.openSignInDialog()" style="cursor:pointer;" title="Switch account">FieldScan<span style="font-weight: 400"> Pro</span></h2>
+          <h2
+            id="sidebar-company-name"
+            onclick="window.openSignInDialog()"
+            style="cursor: pointer"
+            title="Switch account"
+          >
+            FieldScan<span style="font-weight: 400"> Pro</span>
+          </h2>
         </div>
         <div
           id="sync-status"
@@ -62,43 +69,83 @@
 
       <!-- Segment Bar -->
       <div class="segment-bar app-nav">
-        <button class="segment-btn" data-page="dashboard" onclick="showPage('dashboard')">
+        <button
+          class="segment-btn"
+          data-page="dashboard"
+          onclick="showPage('dashboard')"
+        >
           <i class="fas fa-chart-line"></i> Projects
         </button>
-        <button class="segment-btn" data-page="estimates" onclick="showPage('estimates')">
+        <button
+          class="segment-btn"
+          data-page="estimates"
+          onclick="showPage('estimates')"
+        >
           <i class="fas fa-file-invoice"></i> Estimates
         </button>
 
         <span class="nav-divider"></span>
 
-        <button class="segment-btn" data-page="tasks" onclick="showPage('tasks')">
+        <button
+          class="segment-btn"
+          data-page="tasks"
+          onclick="showPage('tasks')"
+        >
           <i class="fas fa-list-check"></i> Tasks
         </button>
-        <button class="segment-btn" data-page="inspections" onclick="showPage('inspections')">
+        <button
+          class="segment-btn"
+          data-page="inspections"
+          onclick="showPage('inspections')"
+        >
           <i class="fas fa-clipboard-check"></i> Inspections
         </button>
-        <button class="segment-btn" data-page="takeoff" onclick="showPage('takeoff')">
+        <button
+          class="segment-btn"
+          data-page="takeoff"
+          onclick="showPage('takeoff')"
+        >
           <i class="fas fa-ruler-combined"></i> Take-Off
         </button>
-        <button class="segment-btn" data-page="calculators" onclick="showPage('calculators')">
+        <button
+          class="segment-btn"
+          data-page="calculators"
+          onclick="showPage('calculators')"
+        >
           <i class="fas fa-calculator"></i> Calculators
         </button>
 
         <span class="nav-divider"></span>
 
-        <button class="segment-btn" data-page="clients" onclick="showPage('clients')">
+        <button
+          class="segment-btn"
+          data-page="clients"
+          onclick="showPage('clients')"
+        >
           <i class="fas fa-address-book"></i> Clients
         </button>
-        <button class="segment-btn" data-page="vendors" onclick="showPage('vendors')">
+        <button
+          class="segment-btn"
+          data-page="vendors"
+          onclick="showPage('vendors')"
+        >
           <i class="fas fa-truck"></i> Vendors
         </button>
 
         <span class="nav-divider"></span>
 
-        <button class="segment-btn" data-page="accounts" onclick="showPage('accounts')">
+        <button
+          class="segment-btn"
+          data-page="accounts"
+          onclick="showPage('accounts')"
+        >
           <i class="fas fa-file-invoice-dollar"></i> Accounts
         </button>
-        <button class="segment-btn" data-page="reports" onclick="showPage('reports')">
+        <button
+          class="segment-btn"
+          data-page="reports"
+          onclick="showPage('reports')"
+        >
           <i class="fas fa-file-alt"></i> Reports
         </button>
 
@@ -130,13 +177,26 @@
 
         <span class="nav-divider nav-divider-bottom"></span>
 
-        <button id="sidebar-signin-btn" class="segment-btn" onclick="window.handleSignInMenuClick()" style="color:#b45309;">
+        <button
+          id="sidebar-signin-btn"
+          class="segment-btn"
+          onclick="window.handleSignInMenuClick()"
+          style="color: #b45309"
+        >
           <i class="fas fa-right-to-bracket"></i> Sign In
         </button>
-        <button class="segment-btn" data-page="print-layouts" onclick="showPage('print-layouts')">
+        <button
+          class="segment-btn"
+          data-page="print-layouts"
+          onclick="showPage('print-layouts')"
+        >
           <i class="fas fa-print"></i> Print Layouts
         </button>
-        <button class="segment-btn" data-page="settings" onclick="showPage('settings')">
+        <button
+          class="segment-btn"
+          data-page="settings"
+          onclick="showPage('settings')"
+        >
           <i class="fas fa-gear"></i> Settings
         </button>
         <button class="segment-btn" data-page="help" onclick="showPage('help')">
@@ -146,60 +206,158 @@
 
       <!-- Mobile bottom tab bar (hidden in the Electron desktop app — see .mobile-bottom-nav in style.css) -->
       <div class="mobile-bottom-nav">
-        <button class="mobile-tab-btn" data-page="dashboard" onclick="showPage('dashboard')">
+        <button
+          class="mobile-tab-btn"
+          data-page="dashboard"
+          onclick="showPage('dashboard')"
+        >
           <i class="fas fa-chart-line"></i><span>Projects</span>
         </button>
-        <button class="mobile-tab-btn" data-page="takeoff" onclick="showPage('takeoff')">
+        <button
+          class="mobile-tab-btn"
+          data-page="takeoff"
+          onclick="showPage('takeoff')"
+        >
           <i class="fas fa-ruler-combined"></i><span>Take-Off</span>
         </button>
-        <button class="mobile-tab-btn" data-page="inspections" onclick="showPage('inspections')">
+        <button
+          class="mobile-tab-btn"
+          data-page="inspections"
+          onclick="showPage('inspections')"
+        >
           <i class="fas fa-clipboard-check"></i><span>Inspect</span>
         </button>
-        <button class="mobile-tab-btn" data-page="tasks" onclick="showPage('tasks')">
+        <button
+          class="mobile-tab-btn"
+          data-page="tasks"
+          onclick="showPage('tasks')"
+        >
           <i class="fas fa-list-check"></i><span>Tasks</span>
         </button>
-        <button class="mobile-tab-btn" id="mobile-more-tab-btn" onclick="openMobileMoreSheet()">
+        <button
+          class="mobile-tab-btn"
+          id="mobile-more-tab-btn"
+          onclick="openMobileMoreSheet()"
+        >
           <i class="fas fa-ellipsis-h"></i><span>More</span>
         </button>
       </div>
 
-      <div class="mobile-more-sheet-overlay" id="mobile-more-sheet-overlay" onclick="if (event.target === this) closeMobileMoreSheet();">
+      <div
+        class="mobile-more-sheet-overlay"
+        id="mobile-more-sheet-overlay"
+        onclick="if (event.target === this) closeMobileMoreSheet();"
+      >
         <div class="mobile-more-sheet">
           <div class="mobile-more-sheet-handle"></div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); window.openGlobalSearch();">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              window.openGlobalSearch();
+            "
+          >
             <i class="fas fa-search"></i> Search
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('estimates');">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              showPage('estimates');
+            "
+          >
             <i class="fas fa-file-invoice"></i> Estimates
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('vendors');">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              showPage('vendors');
+            "
+          >
             <i class="fas fa-truck"></i> Vendors
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('clients');">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              showPage('clients');
+            "
+          >
             <i class="fas fa-address-book"></i> Clients
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('accounts');">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              showPage('accounts');
+            "
+          >
             <i class="fas fa-file-invoice-dollar"></i> Accounts
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('reports');">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              showPage('reports');
+            "
+          >
             <i class="fas fa-file-alt"></i> Reports
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('calculators');">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              showPage('calculators');
+            "
+          >
             <i class="fas fa-calculator"></i> Calculators
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); triggerManualSync();">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              triggerManualSync();
+            "
+          >
             <i class="fas fa-sync-alt"></i> Sync Now
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); refreshAllData();">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              refreshAllData();
+            "
+          >
             <i class="fas fa-database"></i> Refresh Data
           </div>
-          <div id="mobile-signin-btn" class="mobile-more-item" onclick="closeMobileMoreSheet(); window.handleSignInMenuClick();" style="color:#b45309;">
+          <div
+            id="mobile-signin-btn"
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              window.handleSignInMenuClick();
+            "
+            style="color: #b45309"
+          >
             <i class="fas fa-right-to-bracket"></i> Sign In
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('help');">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              showPage('help');
+            "
+          >
             <i class="fas fa-circle-question"></i> Help
           </div>
-          <div class="mobile-more-item" onclick="closeMobileMoreSheet(); showPage('settings');">
+          <div
+            class="mobile-more-item"
+            onclick="
+              closeMobileMoreSheet();
+              showPage('settings');
+            "
+          >
             <i class="fas fa-gear"></i> Settings
           </div>
         </div>
@@ -229,14 +387,29 @@
         <!-- Quick-capture FAB (mobile only) — snap a photo immediately from
              the dashboard, pick which project/tags it belongs to afterward,
              instead of navigating into a project first. -->
-        <button class="mobile-fab" onclick="document.getElementById('quick-capture-input').click()" title="Quick capture">
+        <button
+          class="mobile-fab"
+          onclick="document.getElementById('quick-capture-input').click()"
+          title="Quick capture"
+        >
           <i class="fas fa-camera"></i>
         </button>
-        <input type="file" id="quick-capture-input" accept="image/*" capture="environment" style="display:none" onchange="window.handleQuickCaptureFile(this.files)">
+        <input
+          type="file"
+          id="quick-capture-input"
+          accept="image/*"
+          capture="environment"
+          style="display: none"
+          onchange="window.handleQuickCaptureFile(this.files)"
+        />
 
         <!-- Quick-add task FAB (mobile only) — jot a task down without
              navigating to the Tasks page first. -->
-        <button class="mobile-fab mobile-fab-secondary" onclick="window.openDashboardQuickAddTask()" title="Quick add task">
+        <button
+          class="mobile-fab mobile-fab-secondary"
+          onclick="window.openDashboardQuickAddTask()"
+          title="Quick add task"
+        >
           <i class="fas fa-list-check"></i>
         </button>
       </div>
@@ -420,7 +593,8 @@
               checked
               style="width: auto"
             />
-            Show contract/tax summary (Contract Subtotal, VAT, WHT, Net Receivable)
+            Show contract/tax summary (Contract Subtotal, VAT, WHT, Net
+            Receivable)
           </label>
 
           <div
@@ -443,10 +617,7 @@
             </select>
           </div>
 
-          <div
-            id="rep-period-wrap"
-            style="margin-top: 10px; display: none"
-          >
+          <div id="rep-period-wrap" style="margin-top: 10px; display: none">
             <label>Reporting Period</label>
             <select
               id="rep-period-mode"
@@ -462,7 +633,10 @@
               <option value="entire">Entire Project</option>
               <option value="range">Pick Start &amp; End Date</option>
             </select>
-            <div id="rep-period-range-wrap" style="display: none; margin-top: 8px;">
+            <div
+              id="rep-period-range-wrap"
+              style="display: none; margin-top: 8px"
+            >
               <label>Start Date</label>
               <input
                 type="date"
@@ -475,7 +649,7 @@
                   border: 1.5px solid var(--border);
                 "
               />
-              <label style="margin-top: 8px;">End Date</label>
+              <label style="margin-top: 8px">End Date</label>
               <input
                 type="date"
                 id="rep-period-end"
@@ -489,7 +663,9 @@
               />
             </div>
           </div>
-          <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap">
+          <div
+            style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap"
+          >
             <button
               class="action-btn mobile-only-action"
               style="flex: 1; min-width: 120px"
@@ -497,16 +673,28 @@
             >
               <i class="fas fa-file-pdf"></i> Save PDF
             </button>
-            <button class="action-btn mobile-only-action" onclick="shareReport()">
+            <button
+              class="action-btn mobile-only-action"
+              onclick="shareReport()"
+            >
               <i class="fas fa-share-alt"></i> Share
             </button>
-            <button class="action-btn desktop-only-action" onclick="printReport()">
+            <button
+              class="action-btn desktop-only-action"
+              onclick="printReport()"
+            >
               <i class="fas fa-print"></i> Print
             </button>
           </div>
           <div
             id="report-status-message"
-            style="display: none; margin-top: 10px; font-size: 13px; color: var(--muted); font-weight: 700;"
+            style="
+              display: none;
+              margin-top: 10px;
+              font-size: 13px;
+              color: var(--muted);
+              font-weight: 700;
+            "
           ></div>
         </div>
         <div
@@ -534,124 +722,281 @@
         <div class="card">
           <h3 style="margin-bottom: 12px">Preferences</h3>
           <label>Working Folder</label>
-          <input id="pref-working-folder" placeholder="/Users/you/Documents/FieldScan" />
+          <input
+            id="pref-working-folder"
+            placeholder="/Users/you/Documents/FieldScan"
+          />
           <label>Backend URL</label>
           <input id="pref-backend-url" placeholder="Google Apps Script URL" />
-          <button class="action-btn" style="margin-top: 12px" onclick="savePreferences()">
+          <button
+            class="action-btn"
+            style="margin-top: 12px"
+            onclick="savePreferences()"
+          >
             <i class="fas fa-save"></i> Save Preferences
           </button>
         </div>
         <div class="card">
           <h3 style="margin-bottom: 12px">Data / Backup Manager</h3>
-          <div id="backup-summary" style="font-size: 13px; color: var(--muted); margin-bottom: 12px"></div>
+          <div
+            id="backup-summary"
+            style="font-size: 13px; color: var(--muted); margin-bottom: 12px"
+          ></div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap">
-            <button class="action-btn" style="width: auto" onclick="exportFieldScanBackup()">
+            <button
+              class="action-btn"
+              style="width: auto"
+              onclick="exportFieldScanBackup()"
+            >
               <i class="fas fa-download"></i> Export
             </button>
             <label class="action-btn" style="width: auto; cursor: pointer">
               <i class="fas fa-upload"></i> Restore
-              <input type="file" accept="application/json" onchange="restoreFieldScanBackup(this.files[0]); this.value='';" style="display: none" />
+              <input
+                type="file"
+                accept="application/json"
+                onchange="
+                  restoreFieldScanBackup(this.files[0]);
+                  this.value = '';
+                "
+                style="display: none"
+              />
             </label>
-            <button class="action-btn" style="width: auto; background: var(--danger)" onclick="clearFieldScanBackups()">
+            <button
+              class="action-btn"
+              style="width: auto; background: var(--danger)"
+              onclick="clearFieldScanBackups()"
+            >
               <i class="fas fa-trash"></i> Clear Local Backups
             </button>
           </div>
         </div>
         <div class="card">
-          <h3 style="margin:0 0 8px 0;">Company Details</h3>
-          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px;">
-            Name, logo, address, phone, email, and tax details shown on every document you generate.
+          <h3 style="margin: 0 0 8px 0">Company Details</h3>
+          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px">
+            Name, logo, address, phone, email, and tax details shown on every
+            document you generate.
           </p>
-          <button class="action-btn" style="width: auto; padding: 8px 16px; font-size: 13px;" onclick="window.openCompanyDetailsDialog()">
+          <button
+            class="action-btn"
+            style="width: auto; padding: 8px 16px; font-size: 13px"
+            onclick="window.openCompanyDetailsDialog()"
+          >
             <i class="fas fa-building"></i> Edit Company Details
           </button>
         </div>
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h3 style="margin:0;">Payment Details</h3>
-            <button id="payment-details-edit-btn" class="action-btn" style="width:auto; padding:6px 14px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.togglePaymentDetailsEdit()">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 12px;
+            "
+          >
+            <h3 style="margin: 0">Payment Details</h3>
+            <button
+              id="payment-details-edit-btn"
+              class="action-btn"
+              style="
+                width: auto;
+                padding: 6px 14px;
+                font-size: 12px;
+                background: var(--card-light);
+                color: var(--text);
+              "
+              onclick="window.togglePaymentDetailsEdit()"
+            >
               <i class="fas fa-pen"></i> Edit
             </button>
           </div>
-          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px;">
+          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px">
             Shown on printed Payment Request documents.
           </p>
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+          <div
+            style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px"
+          >
             <div>
               <label>Bank Name</label>
-              <input id="settings-bank-name" placeholder="e.g. First Bank" disabled />
+              <input
+                id="settings-bank-name"
+                placeholder="e.g. First Bank"
+                disabled
+              />
             </div>
             <div>
               <label>Account Name</label>
-              <input id="settings-account-name" placeholder="e.g. FieldScan Pro Ltd" disabled />
+              <input
+                id="settings-account-name"
+                placeholder="e.g. FieldScan Pro Ltd"
+                disabled
+              />
             </div>
             <div>
               <label>Account Number</label>
-              <input id="settings-account-number" type="text" inputmode="numeric" maxlength="10" placeholder="e.g. 0123456789" oninput="this.value = this.value.replace(/[^0-9]/g, '')" disabled />
+              <input
+                id="settings-account-number"
+                type="text"
+                inputmode="numeric"
+                maxlength="10"
+                placeholder="e.g. 0123456789"
+                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                disabled
+              />
             </div>
           </div>
-          <button id="payment-details-save-btn" class="action-btn" style="margin-top: 12px; display: none;" onclick="savePaymentDetailsSettings()">
+          <button
+            id="payment-details-save-btn"
+            class="action-btn"
+            style="margin-top: 12px; display: none"
+            onclick="savePaymentDetailsSettings()"
+          >
             <i class="fas fa-save"></i> Save Payment Details
           </button>
         </div>
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h3 style="margin:0;">My Signature</h3>
-            <button id="my-signature-edit-btn" class="action-btn" style="width:auto; padding:6px 14px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.toggleMySignatureEdit()">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 12px;
+            "
+          >
+            <h3 style="margin: 0">My Signature</h3>
+            <button
+              id="my-signature-edit-btn"
+              class="action-btn"
+              style="
+                width: auto;
+                padding: 6px 14px;
+                font-size: 12px;
+                background: var(--card-light);
+                color: var(--text);
+              "
+              onclick="window.toggleMySignatureEdit()"
+            >
               <i class="fas fa-pen"></i> Edit
             </button>
           </div>
-          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px;">
-            Shown on documents you personally generate. Each user sets their own — this doesn't affect anyone else's signature.
+          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px">
+            Shown on documents you personally generate. Each user sets their own
+            — this doesn't affect anyone else's signature.
           </p>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start;">
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 10px;
+              align-items: start;
+            "
+          >
             <div>
               <label>Printed Name</label>
-              <input id="my-signature-name" placeholder="e.g. Kayode Olubisi" disabled />
+              <input
+                id="my-signature-name"
+                placeholder="e.g. Kayode Olubisi"
+                disabled
+              />
             </div>
             <div>
               <label>Signature Image</label>
-              <div style="display:flex; align-items:center; gap:10px;">
-                <img id="my-signature-preview" style="max-height:44px; max-width:120px; object-fit:contain; border:1px solid var(--border); border-radius:6px; padding:2px; display:none; background:#fff;" />
-                <label id="my-signature-upload-label" class="action-btn" style="width:auto; padding:6px 14px; font-size:12px; cursor:pointer; display:none;">
+              <div style="display: flex; align-items: center; gap: 10px">
+                <img
+                  id="my-signature-preview"
+                  style="
+                    max-height: 44px;
+                    max-width: 120px;
+                    object-fit: contain;
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    padding: 2px;
+                    display: none;
+                    background: #fff;
+                  "
+                />
+                <label
+                  id="my-signature-upload-label"
+                  class="action-btn"
+                  style="
+                    width: auto;
+                    padding: 6px 14px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    display: none;
+                  "
+                >
                   <i class="fas fa-upload"></i> Choose Image
-                  <input id="my-signature-file-input" type="file" accept="image/*" style="display:none;" onchange="window.handleMySignatureFileSelect(this.files[0])" />
+                  <input
+                    id="my-signature-file-input"
+                    type="file"
+                    accept="image/*"
+                    style="display: none"
+                    onchange="window.handleMySignatureFileSelect(this.files[0])"
+                  />
                 </label>
               </div>
             </div>
           </div>
-          <button id="my-signature-save-btn" class="action-btn" style="margin-top: 12px; display: none;" onclick="window.saveMySignatureSettings()">
+          <button
+            id="my-signature-save-btn"
+            class="action-btn"
+            style="margin-top: 12px; display: none"
+            onclick="window.saveMySignatureSettings()"
+          >
             <i class="fas fa-save"></i> Save My Signature
           </button>
         </div>
         <div class="card desktop-only-action">
           <h3 style="margin-bottom: 12px">Project Trash</h3>
-          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px;">
-            Deleted projects land here first, fully recoverable, until you choose to erase one permanently.
+          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px">
+            Deleted projects land here first, fully recoverable, until you
+            choose to erase one permanently.
           </p>
-          <button class="action-btn" style="width: auto; padding: 8px 16px; font-size: 13px;" onclick="window.openProjectTrashPanel()">
+          <button
+            class="action-btn"
+            style="width: auto; padding: 8px 16px; font-size: 13px"
+            onclick="window.openProjectTrashPanel()"
+          >
             <i class="fas fa-box-archive"></i> View Project Trash
           </button>
         </div>
         <div class="card">
           <h3 style="margin-bottom: 12px">Payment ↔ Vendor Links</h3>
-          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px;">
-            One-time cleanup: links older payment records to their vendor by name, so vendor renames don't affect their payment history in reports. Safe to run more than once — it only fills in payments that aren't linked yet, and vendors renamed before this runs can't be recovered by it.
+          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px">
+            One-time cleanup: links older payment records to their vendor by
+            name, so vendor renames don't affect their payment history in
+            reports. Safe to run more than once — it only fills in payments that
+            aren't linked yet, and vendors renamed before this runs can't be
+            recovered by it.
           </p>
-          <button id="backfill-vendor-links-btn" class="action-btn" style="width: auto; padding: 8px 16px; font-size: 13px;" onclick="runPaymentVendorBackfill()">
+          <button
+            id="backfill-vendor-links-btn"
+            class="action-btn"
+            style="width: auto; padding: 8px 16px; font-size: 13px"
+            onclick="runPaymentVendorBackfill()"
+          >
             <i class="fas fa-link"></i> Link Existing Payments to Vendors
           </button>
-          <div id="backfill-vendor-links-result" style="font-size: 12px; color: var(--muted); margin-top: 8px;"></div>
+          <div
+            id="backfill-vendor-links-result"
+            style="font-size: 12px; color: var(--muted); margin-top: 8px"
+          ></div>
         </div>
         <div class="card">
           <h3 style="margin-bottom: 12px">Units of Measurement</h3>
-          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px;">
+          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px">
             Used for the Unit dropdown on Estimate line items.
           </p>
-          <div id="units-settings-list" style="margin-bottom: 12px;"></div>
-          <div style="display: flex; gap: 8px;">
-            <input id="new-unit-input" placeholder="e.g. m³" style="flex: 1;" />
-            <button id="add-unit-btn" class="action-btn" style="width: auto;" onclick="addUnitFromSettings()">
+          <div id="units-settings-list" style="margin-bottom: 12px"></div>
+          <div style="display: flex; gap: 8px">
+            <input id="new-unit-input" placeholder="e.g. m³" style="flex: 1" />
+            <button
+              id="add-unit-btn"
+              class="action-btn"
+              style="width: auto"
+              onclick="addUnitFromSettings()"
+            >
               <i class="fas fa-plus"></i> Add
             </button>
           </div>
@@ -665,18 +1010,39 @@
 
       <!-- Calculators -->
       <div id="view-calculators" class="page-view">
-        <div class="card" style="margin-bottom: 12px;">
-          <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div class="card" style="margin-bottom: 12px">
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            "
+          >
             <h3><i class="fas fa-calculator"></i> Calculators</h3>
-            <button class="action-btn" style="width:auto; padding:8px 14px; font-size:13px; background:var(--card-light); color:var(--text);" onclick="window.openCalculatorConstantsEditor()">
+            <button
+              class="action-btn"
+              style="
+                width: auto;
+                padding: 8px 14px;
+                font-size: 13px;
+                background: var(--card-light);
+                color: var(--text);
+              "
+              onclick="window.openCalculatorConstantsEditor()"
+            >
               <i class="fas fa-sliders-h"></i> Constants
             </button>
           </div>
         </div>
         <div class="calc-columns">
           <div class="card">
-            <label style="display:block; font-weight:800; margin-bottom:4px;">Calculator Type</label>
-            <select id="calc-type-select" onchange="window.switchCalculator(this.value)">
+            <label style="display: block; font-weight: 800; margin-bottom: 4px"
+              >Calculator Type</label
+            >
+            <select
+              id="calc-type-select"
+              onchange="window.switchCalculator(this.value)"
+            >
               <option value="">-- Select Calculator --</option>
               <option value="concrete">Concrete</option>
               <option value="blockwork">Blockwork (6" / 9")</option>
@@ -686,12 +1052,23 @@
               <option value="firealarm">Fire Alarm</option>
               <option value="rebar">Rebar Weight Converter</option>
             </select>
-            <div id="calc-input-container" style="margin-top: 14px;"></div>
+            <div id="calc-input-container" style="margin-top: 14px"></div>
           </div>
-          <div id="calc-output-card" class="card" style="display:none;">
-            <label style="display:block; font-weight:800; margin-bottom:4px;">Result (read-only, copyable)</label>
-            <textarea id="calc-output" rows="14" readonly class="calc-output-textarea"></textarea>
-            <button class="action-btn" style="margin-top:10px; width:auto; padding:10px 22px;" onclick="window.copyCalculatorOutput()">
+          <div id="calc-output-card" class="card" style="display: none">
+            <label style="display: block; font-weight: 800; margin-bottom: 4px"
+              >Result (read-only, copyable)</label
+            >
+            <textarea
+              id="calc-output"
+              rows="14"
+              readonly
+              class="calc-output-textarea"
+            ></textarea>
+            <button
+              class="action-btn"
+              style="margin-top: 10px; width: auto; padding: 10px 22px"
+              onclick="window.copyCalculatorOutput()"
+            >
               <i class="fas fa-copy"></i> Copy to Clipboard
             </button>
           </div>
@@ -899,14 +1276,26 @@
           <button
             id="generate-invoice-btn"
             class="action-btn desktop-only-action"
-            style="width: auto; padding: 8px 16px; font-size: 13px; margin-top: 14px;"
+            style="
+              width: auto;
+              padding: 8px 16px;
+              font-size: 13px;
+              margin-top: 14px;
+            "
             onclick="window.generateProjectInvoice()"
           >
             <i class="fas fa-file-invoice"></i> Generate Invoice
           </button>
           <button
             class="action-btn desktop-only-action"
-            style="width: auto; padding: 8px 16px; font-size: 13px; margin-top: 10px; background: var(--card-light); color: var(--text);"
+            style="
+              width: auto;
+              padding: 8px 16px;
+              font-size: 13px;
+              margin-top: 10px;
+              background: var(--card-light);
+              color: var(--text);
+            "
             onclick="window.openExportProjectFlow()"
           >
             <i class="fas fa-box-archive"></i> Export Project
@@ -914,14 +1303,27 @@
           <button
             id="archive-project-btn"
             class="action-btn desktop-only-action"
-            style="width: auto; padding: 8px 16px; font-size: 13px; margin-top: 10px; background: var(--card-light); color: var(--text);"
+            style="
+              width: auto;
+              padding: 8px 16px;
+              font-size: 13px;
+              margin-top: 10px;
+              background: var(--card-light);
+              color: var(--text);
+            "
             onclick="window.toggleArchiveCurrentProject()"
           >
             <i class="fas fa-box-archive"></i> Archive Project
           </button>
           <button
             class="action-btn desktop-only-action"
-            style="width: auto; padding: 8px 16px; font-size: 13px; margin-top: 10px; background: var(--danger);"
+            style="
+              width: auto;
+              padding: 8px 16px;
+              font-size: 13px;
+              margin-top: 10px;
+              background: var(--danger);
+            "
             onclick="window.trashCurrentProject()"
           >
             <i class="fas fa-trash"></i> Delete Project
@@ -1217,7 +1619,14 @@
             >
               <i class="fas fa-save"></i> Save PCR Fields
             </button>
-            <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap">
+            <div
+              style="
+                display: flex;
+                gap: 10px;
+                margin-top: 12px;
+                flex-wrap: wrap;
+              "
+            >
               <button
                 class="action-btn"
                 style="flex: 1; min-width: 160px"
@@ -1227,7 +1636,12 @@
               </button>
               <button
                 class="action-btn"
-                style="flex: 1; min-width: 160px; background: var(--card-light); color: var(--text)"
+                style="
+                  flex: 1;
+                  min-width: 160px;
+                  background: var(--card-light);
+                  color: var(--text);
+                "
                 onclick="previewPcrReport('payment_request')"
               >
                 <i class="fas fa-money-check-dollar"></i> Print Payment Request
@@ -1265,25 +1679,23 @@
           <div id="doc-view"></div>
         </div>
       </div>
-      </div>
+    </div>
 
-      <!-- Modal Overlay -->
-      <div id="modalOverlay" class="modal-overlay">
-        <div id="modalContent" class="modal">
-          <div style="display: flex; justify-content: space-between">
-            <h3 id="modalTitle">Modal</h3>
-            <span
-              onclick="closeModal()"
-              style="font-size: 28px; cursor: pointer"
-              >&times;</span
-            >
-          </div>
-          <div id="modalBody"></div>
-          <div id="modalFoot" style="margin-top: 20px">
-            <button id="modalSubmit" class="action-btn">Save</button>
-          </div>
+    <!-- Modal Overlay -->
+    <div id="modalOverlay" class="modal-overlay">
+      <div id="modalContent" class="modal">
+        <div style="display: flex; justify-content: space-between">
+          <h3 id="modalTitle">Modal</h3>
+          <span onclick="closeModal()" style="font-size: 28px; cursor: pointer"
+            >&times;</span
+          >
+        </div>
+        <div id="modalBody"></div>
+        <div id="modalFoot" style="margin-top: 20px">
+          <button id="modalSubmit" class="action-btn">Save</button>
         </div>
       </div>
+    </div>
 
     <script src="config.js?v=12"></script>
     <script src="utils.js?v=12"></script>
@@ -1292,11 +1704,14 @@
     <script src="backup.js?v=12"></script>
     <script src="api.js?v=16"></script>
     <script src="payment-helpers.js?v=12"></script>
+    <script src="templates.js?v=1"></script>
     <script src="workorder-helpers.js?v=12"></script>
+    <script src="takeoff-helpers.js?v=1"></script>
     <script src="reports.js?v=12"></script>
     <script src="layouts.js?v=12"></script>
     <script src="accounts.js?v=12"></script>
     <script src="modals.js?v=12"></script>
+    <script src="projects.js?v=1"></script>
     <script src="dashboard.js?v=12"></script>
     <script src="console.js?v=12"></script>
     <script src="changeorders.js?v=13"></script>

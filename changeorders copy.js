@@ -1,11 +1,65 @@
 // ===== CHANGE ORDERS =====
+// Add this at the TOP of changeorders.js (before any functions):
 
-// Still needed -- used throughout the Change Order report preview/print
-// flow below (attachment picker state). Was accidentally removed along
-// with the dead IIFE code that used to sit right above it.
+/* global loadProgressTimelineFeed, loadSnagsListings, loadWorkOrdersListings, 
+   loadPaymentsListings, loadChangeOrdersListings */
+
 let coReportSelectedAttachmentIndex = 0;
 
-// NOTE: switchConsoleSegment is defined in projects.js (loaded before changeorders.js)
+let takeOffLineItems = [];
+
+// Inject into GET_ACTION_BY_STORE
+(function () {
+  const existing = window.GET_ACTION_BY_STORE || {};
+  existing.changeOrders = "getChangeOrders";
+  window.GET_ACTION_BY_STORE = existing;
+})();
+
+// Inject into MUTATION_MAP
+(function () {
+  const existing = window.MUTATION_MAP || {};
+  existing.saveChangeOrder = {
+    store: "changeOrders",
+    idKey: "changeOrderId",
+    mode: "upsert",
+  };
+  existing.updateChangeOrder = {
+    store: "changeOrders",
+    idKey: "changeOrderId",
+    mode: "upsert",
+  };
+  existing.deleteChangeOrder = {
+    store: "changeOrders",
+    idKey: "changeOrderId",
+    mode: "delete",
+  };
+  window.MUTATION_MAP = existing;
+})();
+
+// Re-seed cache from backup for change orders
+(function seedChangeOrdersBackup() {
+  try {
+    const raw = localStorage.getItem("fb_getChangeOrders");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const cache = getCache();
+        cache.changeOrders = parsed;
+        setCache(cache);
+      }
+    }
+  } catch (e) {}
+})();
+
+// Hook into preloadAllData
+(function () {
+  const original =
+    window._originalPreloadAllData ||
+    (window._originalPreloadAllData = async function () {});
+  // We rely on the existing preload loop; change orders will be fetched on first console load
+})();
+
+// NOTE: switchConsoleSegment is defined in console.js (loaded after changeorders.js)
 // changeorders.js just needs to export its own loader functions.
 // The console.js version will call loadChangeOrdersListings() when seg === "changeorders".
 
@@ -55,16 +109,16 @@ async function loadChangeOrdersListings(forceRefresh = false) {
     `<div class="console-cards-grid">` +
     projectChangeOrders
       .map((v) => {
-        const key = `changeorder:${v.changeOrderId}`;
-        window.modalRecordCache = window.modalRecordCache || {};
-        window.modalRecordCache[key] = v;
-        const statusColors = {
-          Draft: "var(--muted)",
-          Submitted: "#fd7e14",
-          Approved: "var(--success)",
-          Rejected: "var(--danger)",
-        };
-        return `<div class="card" style="border-left:6px solid ${statusColors[v.status] || "var(--muted)"}; cursor:pointer;" onclick="${isElectronApp ? `window.openChangeOrderModal(window.modalRecordCache['${key}'])` : `window.previewChangeOrderReport('${escapeAttr(v.changeOrderId)}')`}" title="${isElectronApp ? "Click to edit" : "Open printable report"}">
+      const key = `changeorder:${v.changeOrderId}`;
+      window.modalRecordCache = window.modalRecordCache || {};
+      window.modalRecordCache[key] = v;
+      const statusColors = {
+        Draft: "var(--muted)",
+        Submitted: "#fd7e14",
+        Approved: "var(--success)",
+        Rejected: "var(--danger)",
+      };
+      return `<div class="card" style="border-left:6px solid ${statusColors[v.status] || "var(--muted)"}; cursor:pointer;" onclick="${isElectronApp ? `window.openChangeOrderModal(window.modalRecordCache['${key}'])` : `window.previewChangeOrderReport('${escapeAttr(v.changeOrderId)}')`}" title="${isElectronApp ? "Click to edit" : "Open printable report"}">
         <div style="display:flex; justify-content:space-between; align-items:start; gap:10px;">
           <div>
             <strong style="font-size:18px;">${escapeHtml(v.changeOrderNumber || v.changeOrderId)}</strong>
@@ -131,9 +185,7 @@ function openChangeOrderModal(editData = null) {
 
   const lineItemsHtml = lineItems
     .map((item) => {
-      const amt = roundMoney(
-        (Number(item.qty) || 0) * (Number(item.rate) || 0),
-      );
+      const amt = roundMoney((Number(item.qty) || 0) * (Number(item.rate) || 0));
       return `<tr class="co-line-row">
     <td style="padding:4px; border-bottom:1px solid var(--border);"><input class="co-line-desc" value="${escapeAttr(item.description || "")}" placeholder="Description" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px;"></td>
     <td style="padding:4px; border-bottom:1px solid var(--border); width:60px;"><input class="co-line-qty" type="number" value="${escapeAttr(item.qty != null ? item.qty : "")}" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.recalcChangeOrderTotals()"></td>
@@ -215,23 +267,15 @@ function openChangeOrderModal(editData = null) {
   if (currentModalFiles.length)
     populateModalInlineImageGalleryPreviews("changeOrderAttachmentsPreviews");
   document.getElementById("co_files").onchange = (e) =>
-    processIncomingMultiAttachments(
-      e.target.files,
-      "changeOrderAttachmentsPreviews",
-    );
+    processIncomingMultiAttachments(e.target.files, "changeOrderAttachmentsPreviews");
   if (typeof wireAttachmentDropZone === "function")
-    wireAttachmentDropZone(
-      "co_attach_dropzone",
-      "changeOrderAttachmentsPreviews",
-    );
+    wireAttachmentDropZone("co_attach_dropzone", "changeOrderAttachmentsPreviews");
 
   if (isEdit) {
     document.getElementById("co_delete_btn").onclick = () => {
       const cache = getCache();
       closeModal();
-      cache.changeOrders = (cache.changeOrders || []).filter(
-        (c) => c.changeOrderId !== editData.changeOrderId,
-      );
+      cache.changeOrders = (cache.changeOrders || []).filter((c) => c.changeOrderId !== editData.changeOrderId);
       setCache(cache);
       loadChangeOrdersListings(false);
       refreshMasterDashboard();
@@ -239,9 +283,7 @@ function openChangeOrderModal(editData = null) {
         "changeorder:" + editData.changeOrderId,
         "Change Order deleted",
         function () {
-          callApi("deleteChangeOrder", {
-            changeOrderId: editData.changeOrderId,
-          }).catch(function (err) {
+          callApi("deleteChangeOrder", { changeOrderId: editData.changeOrderId }).catch(function (err) {
             console.error("Delete failed after undo window expired", err);
           });
         },
@@ -322,8 +364,7 @@ function openChangeOrderModal(editData = null) {
         // the Contract Subtotal / Net Receivable shown in the console
         // would otherwise still show the stale figure until a full
         // reload. Mirror the same delta locally so it updates immediately.
-        const wasApproved =
-          isEdit && editData && editData.status === "Approved";
+        const wasApproved = isEdit && editData && editData.status === "Approved";
         const oldTotal = isEdit && editData ? Number(editData.total || 0) : 0;
         let delta = 0;
         if (payload.status === "Approved") {
@@ -333,13 +374,9 @@ function openChangeOrderModal(editData = null) {
         }
         if (delta !== 0) {
           const cache = getCache();
-          const proj = (cache.projects || []).find(
-            (p) => p.projectId === projectId,
-          );
+          const proj = (cache.projects || []).find((p) => p.projectId === projectId);
           if (proj) {
-            proj.contractSubtotal = roundMoney(
-              (Number(proj.contractSubtotal) || 0) + delta,
-            );
+            proj.contractSubtotal = roundMoney((Number(proj.contractSubtotal) || 0) + delta);
             setCache(cache);
           }
         }
@@ -396,12 +433,7 @@ function recalcChangeOrderTotals() {
   if (vatRateEl) vatRateEl.innerText = formatTaxRate(getTaxRate("VAT"));
 }
 
-async function renderChangeOrderReport(
-  changeOrder,
-  project,
-  settings,
-  selectedAttachmentIndex,
-) {
+async function renderChangeOrderReport(changeOrder, project, settings, selectedAttachmentIndex) {
   if (settings && settings.data) settings = settings.data;
 
   let lineItems = [];
@@ -512,15 +544,8 @@ async function previewChangeOrderReport(changeOrderId) {
   overlay.style.display = "flex";
 
   coReportSelectedAttachmentIndex = 0;
-  const resolvedAttachments = await resolveAttachmentList(
-    changeOrder.attachments,
-  );
-  const changeOrderReportHtml = await renderChangeOrderReport(
-    changeOrder,
-    project,
-    cache.settings || {},
-    coReportSelectedAttachmentIndex,
-  );
+  const resolvedAttachments = await resolveAttachmentList(changeOrder.attachments);
+  const changeOrderReportHtml = await renderChangeOrderReport(changeOrder, project, cache.settings || {}, coReportSelectedAttachmentIndex);
   body.innerHTML = `
     <label style="display:flex; align-items:center; gap:8px; margin-bottom:12px; font-weight:700; cursor:pointer;">
       <input type="checkbox" id="co-rep-client-sig" style="width:auto;" onchange="window.regenerateChangeOrderPreview('${escapeAttr(changeOrderId)}')">
@@ -555,9 +580,7 @@ async function previewChangeOrderReport(changeOrderId) {
     submit.innerText = "Generating...";
     const pdf = await generateReportPDF("portrait");
     if (pdf) {
-      pdf.save(
-        `ChangeOrder_${changeOrder.changeOrderNumber || changeOrderId}.pdf`,
-      );
+      pdf.save(`ChangeOrder_${changeOrder.changeOrderNumber || changeOrderId}.pdf`);
     }
     submit.disabled = false;
     submit.innerText = "Save PDF";
@@ -587,29 +610,15 @@ async function regenerateChangeOrderAttachment(changeOrderId, index) {
   const cache = getCache();
   const projectId = getCurrentProjectId();
   const project = cache.projects.find((p) => p.projectId === projectId);
-  const changeOrder = (cache.changeOrders || []).find(
-    (v) => v.changeOrderId === changeOrderId,
-  );
+  const changeOrder = (cache.changeOrders || []).find((v) => v.changeOrderId === changeOrderId);
   if (!changeOrder) return;
-  const resolvedAttachments = await resolveAttachmentList(
-    changeOrder.attachments,
-  );
+  const resolvedAttachments = await resolveAttachmentList(changeOrder.attachments);
   const pickerEl = document.getElementById("co-report-picker");
   if (pickerEl)
-    pickerEl.innerHTML = renderAttachmentPickerHtml(
-      resolvedAttachments,
-      index,
-      "window.regenerateChangeOrderAttachment",
-      `'${escapeAttr(changeOrderId)}'`,
-    );
+    pickerEl.innerHTML = renderAttachmentPickerHtml(resolvedAttachments, index, "window.regenerateChangeOrderAttachment", `'${escapeAttr(changeOrderId)}'`);
   const preview = document.getElementById("co-report-preview");
   if (preview)
-    preview.innerHTML = await renderChangeOrderReport(
-      changeOrder,
-      project,
-      cache.settings || {},
-      index,
-    );
+    preview.innerHTML = await renderChangeOrderReport(changeOrder, project, cache.settings || {}, index);
 }
 window.regenerateChangeOrderAttachment = regenerateChangeOrderAttachment;
 
