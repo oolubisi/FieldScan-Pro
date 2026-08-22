@@ -843,7 +843,7 @@ function buildPieChartSvg(slices) {
   if (total <= 0) {
     // No activity yet (e.g. a brand-new project) -- a neutral placeholder,
     // not a crash or a meaningless chart.
-    return `<svg width="225" height="225" viewBox="0 0 225 225"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#e9ecef"/></svg>`;
+    return `<svg width="100%" height="auto" viewBox="0 0 225 225" style="max-width:225px;"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#e9ecef"/></svg>`;
   }
   let angleStart = -90; // 12 o'clock, matches conventional pie chart orientation
   const paths = [];
@@ -884,7 +884,7 @@ function buildPieChartSvg(slices) {
     }
     angleStart = angleEnd;
   });
-  return `<svg width="225" height="225" viewBox="0 0 225 225">${paths.join("")}${labels.join("")}</svg>`;
+  return `<svg width="100%" height="auto" viewBox="0 0 225 225" style="max-width:225px;">${paths.join("")}${labels.join("")}</svg>`;
 }
 
 /**
@@ -1053,8 +1053,8 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     `${await generateReportHeader("Executive Project Report", project)}
     <div style="font-size:13px; font-weight:700; color:#495057; margin-bottom:16px;">Reporting Period: ${escapeHtml(periodLabel)}</div>
     <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 16px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Project Snapshot</h3>
-    <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px;">
-      <div style="flex: 2; min-width:260px;">
+    <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px;">
+      <div style="flex: 1 1 240px; min-width:0;">
         ${financialRowHTML("Total Invoices", totalInvoices, true, null, false)}
         ${financialRowHTML("Professional Fees (paid)", professionalFees.paid, false, "var(--success)")}
         ${financialRowHTML("Government Fees (paid)", governmentFees.paid, false, "var(--success)")}
@@ -1063,7 +1063,7 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
         ${financialRowHTML("Pending Payments", totalPending, false, "#fd7e14")}
         ${buildPieChartLegendHtml(pieSlices)}
       </div>
-      <div style="flex: 0 0 auto; width:225px; text-align:center;">
+      <div style="flex: 0 0 auto; width:190px; text-align:center;">
         ${buildPieChartSvg(pieSlices)}
       </div>
     </div>
