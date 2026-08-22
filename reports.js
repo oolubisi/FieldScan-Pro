@@ -110,12 +110,29 @@ async function generateReportPDF(orientation) {
         const scaledHeight = imgProps.height * ratio;
         let heightLeft = scaledHeight;
         let position = margin;
+        // Clip each page's drawn image to exactly the margin-bounded page
+        // area -- addImage on its own just draws the full (very tall)
+        // image at the given position with no awareness of page
+        // boundaries, so without this, content silently bled through the
+        // bottom margin of one page and the top margin of the next at
+        // every page break (the physical page edge was the only thing
+        // stopping it, not the intended margin).
+        pdf.saveGraphicsState();
+        pdf.rect(margin, margin, pageWidth, pageHeight);
+        pdf.clip();
+        pdf.discardPath();
         pdf.addImage(imgData, "JPEG", margin, position, pageWidth, scaledHeight, undefined, "FAST");
+        pdf.restoreGraphicsState();
         heightLeft -= pageHeight;
         while (heightLeft > 2) {
           pdf.addPage();
           position = margin + heightLeft - scaledHeight;
+          pdf.saveGraphicsState();
+          pdf.rect(margin, margin, pageWidth, pageHeight);
+          pdf.clip();
+          pdf.discardPath();
           pdf.addImage(imgData, "JPEG", margin, position, pageWidth, scaledHeight, undefined, "FAST");
+          pdf.restoreGraphicsState();
           heightLeft -= pageHeight;
         }
         continue;
