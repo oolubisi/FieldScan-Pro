@@ -847,6 +847,10 @@ function buildPieChartSvg(slices) {
   }
   let angleStart = -90; // 12 o'clock, matches conventional pie chart orientation
   const paths = [];
+  const labels = [];
+  // Percentage label radius -- inside the slice, not at its outer edge or
+  // dead-center, so it reads as belonging to that wedge specifically.
+  const labelRadius = r * 0.65;
   slices.forEach((sl) => {
     const fraction = sl.value / total;
     const angleSweep = fraction * 360;
@@ -868,10 +872,40 @@ function buildPieChartSvg(slices) {
         const largeArc = angleSweep > 180 ? 1 : 0;
         paths.push(`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z" fill="${sl.color}"/>`);
       }
+      // Skip the label on slivers too thin to hold readable text -- the
+      // legend still shows their exact percentage regardless.
+      if (fraction >= 0.04) {
+        const midRad = ((angleStart + angleEnd) / 2 * Math.PI) / 180;
+        const lx = cx + labelRadius * Math.cos(midRad);
+        const ly = cy + labelRadius * Math.sin(midRad);
+        const pct = Math.round(fraction * 100);
+        labels.push(`<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="13" font-weight="700" style="paint-order:stroke; stroke:rgba(0,0,0,0.35); stroke-width:2px;">${pct}%</text>`);
+      }
     }
     angleStart = angleEnd;
   });
-  return `<svg width="225" height="225" viewBox="0 0 225 225">${paths.join("")}</svg>`;
+  return `<svg width="225" height="225" viewBox="0 0 225 225">${paths.join("")}${labels.join("")}</svg>`;
+}
+
+/**
+ * Legend for buildPieChartSvg's slices -- a color swatch, label, and
+ * percentage per row. Kept as a separate function (not folded into the
+ * SVG itself) since it renders as plain HTML alongside the chart, not as
+ * part of the SVG's own markup.
+ */
+function buildPieChartLegendHtml(slices) {
+  const total = slices.reduce((s, sl) => s + sl.value, 0);
+  const rows = slices
+    .map((sl) => {
+      const pct = total > 0 ? Math.round((sl.value / total) * 100) : 0;
+      return `<div style="display:flex; align-items:center; gap:5px; font-size:10.5px; line-height:1.3;">
+        <span style="width:9px; height:9px; border-radius:2px; background:${sl.color}; flex-shrink:0; display:inline-block;"></span>
+        <span style="flex:1; margin-right:10mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(sl.label)}</span>
+        <span style="font-weight:700; flex-shrink:0;">${pct}%</span>
+      </div>`;
+    })
+    .join("");
+  return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:3px calc(10px + 15mm); text-align:left; margin-top:8px;">${rows}</div>`;
 }
 
 
@@ -908,15 +942,34 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
   const totalInvoices = roundMoney(
     inScopeGroups.reduce((sum, g) => sum + (Number(g.totalInvoice) || 0), 0),
   );
-  const totalPaidOut = roundMoney(
-    inScopeGroups.reduce((sum, g) => {
-      const relevantStages = periodRange ? g.stages.filter((s) => inRange(s.paymentDate)) : g.stages;
-      return sum + relevantStages.reduce((s, st) => s + (Number(st.amount) || 0), 0);
-    }, 0),
-  );
   const totalPending = roundMoney(
     inScopeGroups.reduce((sum, g) => sum + Math.max(0, g.balance || 0), 0),
   );
+
+  // Per-category paid/pending breakdown -- Professional Fees, Government
+  // Fees, and Misc are existing payment categories; Contractor Payment is
+  // a new category too, no longer a calculated residual (Total Invoices
+  // minus everything else), matching Government Fees and Professional
+  // Fees as a direct, selectable category on the payment form. Client
+  // Receipt groups excluded throughout -- these are expense categories,
+  // not something a client receipt would ever carry.
+  function categoryPaidAndPending(category) {
+    let paid = 0;
+    let pending = 0;
+    inScopeGroups
+      .filter((g) => g.direction !== "Client Receipt" && g.expenseCategory === category)
+      .forEach((g) => {
+        const relevantStages = periodRange ? g.stages.filter((s) => inRange(s.paymentDate)) : g.stages;
+        paid += relevantStages.reduce((s, st) => s + (Number(st.amount) || 0), 0);
+        pending += Math.max(0, g.balance || 0);
+      });
+    return { paid: roundMoney(paid), pending: roundMoney(pending) };
+  }
+  const professionalFees = categoryPaidAndPending("Professional Fees");
+  const governmentFees = categoryPaidAndPending("Government Fees");
+  const miscellaneous = categoryPaidAndPending("Misc");
+  const contractor = categoryPaidAndPending("Contractor Payment");
+
 
   const periodLabel = periodRange
     ? `${ymd(periodRange.start)} to ${ymd(periodRange.end)}`
@@ -931,9 +984,11 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     : progressLogs;
 
   const pieSlices = [
-    { label: "Total Invoices", value: Math.abs(totalInvoices), color: "#343a40" },
-    { label: "Total Paid Out", value: Math.abs(totalPaidOut), color: "#28a745" },
-    { label: "Total Pending", value: Math.abs(totalPending), color: "#fd7e14" },
+    { label: "Professional Fees", value: Math.abs(professionalFees.paid), color: "#0056b3" },
+    { label: "Government Fees", value: Math.abs(governmentFees.paid), color: "#6f42c1" },
+    { label: "Miscellaneous", value: Math.abs(miscellaneous.paid), color: "#20c997" },
+    { label: "Contractor", value: Math.abs(contractor.paid), color: "#343a40" },
+    { label: "Pending Payments", value: Math.abs(totalPending), color: "#fd7e14" },
   ];
 
   const paymentRowsHtml = periodPayments.length
@@ -998,16 +1053,33 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     `${await generateReportHeader("Executive Project Report", project)}
     <div style="font-size:13px; font-weight:700; color:#495057; margin-bottom:16px;">Reporting Period: ${escapeHtml(periodLabel)}</div>
     <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 16px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Project Snapshot</h3>
-    <div style="display:flex; gap:24px; align-items:center; flex-wrap:wrap; margin-bottom:20px;">
-      <div style="max-width: calc(420px - 30mm); margin: 0; flex: 1; min-width:220px;">
+    <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px;">
+      <div style="flex: 2; min-width:260px;">
         ${financialRowHTML("Total Invoices", totalInvoices, true, null, false)}
-        ${financialRowHTML("Total Paid Out", totalPaidOut, false, "var(--success)")}
-        ${financialRowHTML("Total Pending", totalPending, false, "#fd7e14")}
+        ${financialRowHTML("Professional Fees (paid)", professionalFees.paid, false, "var(--success)")}
+        ${financialRowHTML("Government Fees (paid)", governmentFees.paid, false, "var(--success)")}
+        ${financialRowHTML("Miscellaneous (paid)", miscellaneous.paid, false, "var(--success)")}
+        ${financialRowHTML("Contractor", contractor.paid, false, "var(--success)")}
+        ${financialRowHTML("Pending Payments", totalPending, false, "#fd7e14")}
+        ${buildPieChartLegendHtml(pieSlices)}
       </div>
-      <div style="text-align:center;">
+      <div style="flex: 0 0 auto; width:225px; text-align:center;">
         ${buildPieChartSvg(pieSlices)}
       </div>
     </div>
+    <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Pending Payments Breakdown</h3>
+    <table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px; margin-bottom:20px;">
+      <thead><tr>
+        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Category</th>
+        <th style="background:#000; color:#fff; text-align:right; padding:8px; font-size:10px; text-transform:uppercase;">Pending</th>
+      </tr></thead>
+      <tbody>
+        <tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">Professional Fees</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(professionalFees.pending)}</td></tr>
+        <tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">Government Fees</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(governmentFees.pending)}</td></tr>
+        <tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">Miscellaneous</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(miscellaneous.pending)}</td></tr>
+        <tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">Contractor</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(contractor.pending)}</td></tr>
+      </tbody>
+    </table>
     <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">This Period's Activity</h3>
     <table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px; margin-bottom:20px;">
       <thead><tr>

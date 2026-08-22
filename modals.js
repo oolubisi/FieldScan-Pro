@@ -7,10 +7,6 @@ function resetSubmitOnError(submit) {
   return (err) => {
     submit.disabled = false;
     submit.innerText = "Save";
-    // This used to reset the button and stop there -- silently, with
-    // no indication anything went wrong at all. Affects every modal
-    // that shares this same helper: Project, Vendor, Work Order, Snag,
-    // Payment.
     const message = String((err && err.message) || err || "");
     if (message.includes("401")) {
       alert("You're not signed in. Please sign in and try again.");
@@ -107,12 +103,6 @@ function populateModalInlineImageGalleryPreviews(containerId) {
     })
     .join("");
 
-  // Already-uploaded attachments are just a bare Drive file ID — the doGet
-  // endpoint returns that as text/plain, not real image bytes, so using it
-  // directly as an <img src> renders blank (same issue fixed elsewhere in
-  // reports/photos/documents). Resolve each one to a real data URI and
-  // swap in the actual thumbnail once it arrives, without blocking the
-  // rest of the preview from showing immediately.
   currentModalFiles.forEach((url, idx) => {
     if (url.startsWith("data:")) return;
     resolveImageToDataUrl(url).then((resolved) => {
@@ -131,12 +121,6 @@ function removeAttachmentByIndex(idx, containerId) {
   populateModalInlineImageGalleryPreviews(containerId);
 }
 
-/**
- * Adds drag-and-drop support to an attachment upload zone, on top of the
- * existing click-to-browse file input. Drop just feeds the same file list
- * into processIncomingMultiAttachments() that the file input's onchange
- * already uses, so compression/upload behavior is identical either way.
- */
 function wireAttachmentDropZone(zoneId, previewId) {
   const zone = document.getElementById(zoneId);
   if (!zone) return;
@@ -209,7 +193,6 @@ function closeModal() {
   document.getElementById("modalOverlay").style.display = "none";
   const content = document.getElementById("modalContent");
   if (content) content.classList.remove("modal-fullscreen");
-  // Restore default submit button in case a custom modal replaced it
   const foot = document.getElementById("modalFoot");
   if (foot) {
     foot.innerHTML =
@@ -226,7 +209,6 @@ async function refreshPaymentAttachmentsList(projectId, paymentId) {
   } catch (e) {
     console.error("attachments.list failed", e);
   }
-  // Only show files belonging to this payment (renamed to start with its ID)
   const mine = files.filter((f) => f.name.startsWith(paymentId));
   if (!mine.length) {
     list.innerHTML =
@@ -248,8 +230,6 @@ window.refreshPaymentAttachmentsList = refreshPaymentAttachmentsList;
 
 async function addPaymentAttachment(projectId, paymentId) {
   try {
-    // renameTo = paymentId, so the file on disk is named after the payment
-    // number regardless of what it was called on the user's computer.
     await window.electronAPI.attachments.add(projectId, "Payments", paymentId);
   } catch (e) {
     console.error("attachments.add failed", e);
@@ -270,32 +250,13 @@ async function removePaymentAttachment(projectId, paymentId, filePath) {
 }
 window.removePaymentAttachment = removePaymentAttachment;
 
-// ===== Snag photos — unified into the Photos system (Phase 2) =====
-// Previously snag photos lived in their own local-only IndexedDB store
-// (SNAG_PHOTO_V2_STORE) and never left the device — the sync hook they
-// called, ptTrySyncSnagPhoto, was never actually defined anywhere in the
-// app, so photos captured on mobile silently never reached desktop or the
-// backend. They also depended on ptCompressImage, which likewise doesn't
-// exist — so capture was throwing (caught and swallowed) rather than
-// working at all. This rewrite routes snag photos through the same
-// cloud-synced Photos pipeline as the project photo library (category:
-// "Snags", linked to the snag via PhotoLinks), which fixes both bugs as a
-// side effect.
-
 async function renderSnagPhotoGalleryV2(snagId) {
   const gallery = document.getElementById("snagPhotoGalleryV2");
   if (!gallery) return;
   let photos = [];
   try {
     const allMeta = await phGetAllMeta();
-    // Photos captured directly through this snag's own capture flow carry
-    // a local linkedSnagId tag (works offline, before the link round-trip
-    // to the server completes).
     const locallyTagged = allMeta.filter((m) => m.linkedSnagId === snagId);
-
-    // Photos linked from the general Photos library (via the link picker,
-    // or tagged category:"Snags" and linked there) live in PhotoLinks on
-    // the server — this is the authoritative many-to-many relationship.
     let linkedIds = [];
     try {
       const links = await callApi("getPhotoLinks", { recordType: "Snag", recordId: snagId });
@@ -304,7 +265,6 @@ async function renderSnagPhotoGalleryV2(snagId) {
       console.warn("getPhotoLinks failed (offline?):", e);
     }
     const linkedPhotos = allMeta.filter((m) => linkedIds.includes(m.photoId));
-
     const merged = new Map();
     [...locallyTagged, ...linkedPhotos].forEach((p) => merged.set(p.photoId, p));
     photos = Array.from(merged.values()).sort((a, b) => (b.capturedAt || 0) - (a.capturedAt || 0));
@@ -352,15 +312,12 @@ async function handleSnagPhotoCapture(fileList, snagId) {
         trade: "",
         activity: "",
         stage: "",
-        linkedSnagId: snagId, // local-only convenience field for gallery filtering
+        linkedSnagId: snagId,
         localOnly: true,
         synced: false,
       };
       await phPutMeta(meta);
       await phPutBlob(photoId, blob);
-
-      // Upload + link, best-effort (offline gets queued automatically via
-      // callApi, same as every other mutation in this app).
       phUploadPhoto(meta).finally(() => {
         callApi("savePhotoLink", {
           photoId,
@@ -381,7 +338,7 @@ async function handleSnagPhotoCapture(fileList, snagId) {
 async function deleteSnagPhotoV2Ui(snagId, photoId) {
   if (!confirm("Delete this photo? It will move to the Recycle Bin.")) return;
   try {
-    await callApi("deletePhoto", { photoId }); // soft delete server-side
+    await callApi("deletePhoto", { photoId });
   } catch (e) {
     console.error("deletePhoto failed", e);
   }
@@ -395,12 +352,6 @@ async function deleteSnagPhotoV2Ui(snagId, photoId) {
 }
 window.deleteSnagPhotoV2Ui = deleteSnagPhotoV2Ui;
 
-/**
- * One-time migration: moves any photos still sitting in the legacy
- * SNAG_PHOTO_V2_STORE (device-local only, never synced — see note above)
- * into the unified Photos pipeline, then clears the old store. Safe to
- * call on every app start; it's a no-op once migration has completed.
- */
 async function migrateLegacySnagPhotos() {
   const FLAG_KEY = "snagPhotoMigrationV1Done";
   if (localStorage.getItem(FLAG_KEY) === "true") return;
@@ -443,14 +394,11 @@ async function migrateLegacySnagPhotos() {
         await deleteSnagPhotoV2(rec.id);
       } catch (e) {
         console.error("Failed to migrate legacy snag photo", rec && rec.id, e);
-        // Leave it in the legacy store so the next app start retries it,
-        // rather than losing the photo silently.
       }
     }
     localStorage.setItem(FLAG_KEY, "true");
   } catch (e) {
     console.error("migrateLegacySnagPhotos failed", e);
-    // Don't set the flag — retry on next app start.
   }
 }
 window.migrateLegacySnagPhotos = migrateLegacySnagPhotos;
@@ -543,7 +491,6 @@ async function openModal(type, editData = null) {
   submit.disabled = false;
   submit.innerText = "Save";
   submit.style.display = "block";
-  // Restore default foot in case a previous custom modal changed it
   const foot = document.getElementById("modalFoot");
   if (foot && foot.innerHTML.indexOf('id="modalSubmit"') === -1) {
     foot.innerHTML =
@@ -601,22 +548,12 @@ async function openModal(type, editData = null) {
     const uniqueId = isEdit ? editData.vendorId : "VND-" + Date.now();
     title.innerText = isEdit ? "Edit Vendor" : "New Vendor";
     if (isEdit) {
-      // The passport column is a single image, but the backend stores it
-      // in a jsonb column defaulting to [] (an empty-array default meant
-      // for list-shaped fields like attachments, not a single image) --
-      // so a vendor with no photo comes back as [] rather than "" or
-      // null. [] is truthy, so the .startsWith() check below used to
-      // reach a real string method call on an array and crash instantly,
-      // before the modal could even open. Coercing defensively here means
-      // this can't crash regardless of what shape the database sends.
       currentAvatarPhoto = typeof editData.passport === "string" ? editData.passport : "";
       if (editData.attachments)
         currentModalFiles = splitAttachments(editData.attachments);
     }
     body.innerHTML = `<div class="passport-frame-container"><img id="passport_frame_view" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M12%2012c2.21%200%204-1.79%204-4s-1.79-4-4-4-4%201.79-4%204%201.79%204%204%204zm0%202c-2.67%200-8%201.34-8%204v2h16v-2c0-2.66-5.33-4-8-4z%22%2F%3E%3C%2Fsvg%3E" style="width:100%; height:100%; object-fit:cover;"><label style="position:absolute; bottom:0; right:0; background:#000; color:white; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><i class="fas fa-camera"></i><input type="file" id="v_pass" accept="image/*" style="display:none"></label><div id="v_pass_remove" onclick="window.clearVendorAvatarPhoto()" style="position:absolute; top:0; right:0; background:red; color:white; border-radius:50%; width:22px; text-align:center; cursor:pointer;">&times;</div></div><label ${labelStyle}>Company</label><input id="v_comp" value="${escapeAttr(isEdit ? editData.company : "")}" ${largeInput}><label ${labelStyle}>Trade</label><input id="v_trade" value="${escapeAttr(isEdit ? editData.trade : "")}" ${largeInput}><label ${labelStyle}>Contact Person</label><input id="v_contact" value="${escapeAttr(isEdit ? editData.contactName : "")}" ${largeInput}><label ${labelStyle}>Phone 1 (11 digits)</label><input id="v_phone1" type="tel" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${escapeAttr(isEdit ? editData.phone1 : "")}" ${largeInput}><label ${labelStyle}>Phone 2</label><input id="v_phone2" type="tel" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${escapeAttr(isEdit ? editData.phone2 : "")}" ${largeInput}><label ${labelStyle}>Email</label><input id="v_email" type="email" value="${escapeAttr(isEdit ? editData.email : "")}" ${largeInput}><label ${labelStyle}>Notes</label><textarea id="v_notes" rows="3" ${largeInput}>${escapeHtml(isEdit ? editData.notes || "" : "")}</textarea><div id="vendorAttachmentsPreviews" class="modal-preview-grid" style="display:none;"></div></div><label class="icon-upload-label"><i class="fas fa-paperclip"></i><input type="file" id="v_files" accept="image/*,application/pdf" multiple style="display:none"></label>${isEdit ? `<button class="action-btn" id="v_delete_btn" style="background:${(String(editData.archived).toLowerCase() === "yes" || editData.archived === true) ? "var(--success)" : "var(--danger)"}; margin-top:10px;">${(String(editData.archived).toLowerCase() === "yes" || editData.archived === true) ? "Unarchive" : "Archive"}</button>` : ""}`;
     if (currentAvatarPhoto && !currentAvatarPhoto.startsWith("data:")) {
-      // Same recurring bug as everywhere else: a bare Drive file ID doesn't
-      // render as an <img src> until it's actually fetched and resolved.
       resolveImageToDataUrl(currentAvatarPhoto).then((resolved) => {
         if (!resolved) return;
         const img = document.getElementById("passport_frame_view");
@@ -706,27 +643,10 @@ async function openModal(type, editData = null) {
         .catch(resetSubmitOnError(submit));
     };
   } else if (type === "progress_entry") {
-    // This branch was entirely missing -- openModalWithRecord('progress_entry', ...)
-    // had nothing to match against, so body.innerHTML never got set at
-    // all, while the Save button (built by shared, type-independent code
-    // further down) still appeared -- exactly "form not opening fully,
-    // only shows the Save button".
-    //
-    // isEdit alone (!!editData) isn't enough here: creating a new
-    // sub-task passes a minimal editData object (just to carry
-    // parentLogId/projectId through), which would otherwise make the
-    // global isEdit true and incorrectly show an "edit" form with mostly
-    // blank fields instead of a genuine new-entry form.
     const isNewSubTask = isEdit && editData._isSubTask === true;
     const isEditingLog = isEdit && !isNewSubTask;
     const parentLogId = isEdit ? editData.parentLogId : undefined;
 
-    // A log with sub-logs has its % computed from them (see
-    // computeLogDisplayPercentage in console.js) -- manually typing a
-    // different value here would just be silently overwritten and
-    // ignored the next time the list re-renders, which is confusing.
-    // Disabling it here makes that genuinely true instead of just
-    // visually true.
     const allLogsForCheck = (typeof getCache === "function" && getCache().progressLogs) || [];
     const hasChildren = isEditingLog && allLogsForCheck.some((l) => l.parentLogId === editData.logId);
     const displayPercent = hasChildren && typeof computeLogDisplayPercentage === "function"
@@ -987,9 +907,6 @@ async function openModal(type, editData = null) {
             : "",
         status: status,
       };
-      // Photos save to local storage as soon as they're captured (and
-      // sync to desktop in the background), so there's nothing photo
-      // related left to persist here.
       callApi(isEdit ? "updateSnag" : "saveSnag", payload)
         .then(() => {
           closeModal();
@@ -1074,7 +991,7 @@ ${projects.map((p) => `<option value="${escapeAttr(p.clientName)}" data-project-
 <option value="Client Receipt" ${currentDir === "Client Receipt" ? "selected" : ""}>Client Receipt</option>
 <option value="Outgoing Payment" ${currentDir === "Outgoing Payment" ? "selected" : ""}>Outgoing Payment</option>
 <option value="Small Expense" ${currentDir === "Small Expense" ? "selected" : ""}>Small Expense</option>
-</select><label ${labelStyle}>Payee</label><div id="pay_payee_wrap">${payeeFieldHtml(currentDir)}</div><label ${labelStyle}>Category</label><select id="pay_cat" ${largeInput}><option value="">--</option><option value="Labour" ${isEdit && editData.expenseCategory === "Labour" ? "selected" : ""}>Labour</option><option value="Materials" ${isEdit && editData.expenseCategory === "Materials" ? "selected" : ""}>Materials</option><option value="Subcontractor Cost" ${isEdit && editData.expenseCategory === "Subcontractor Cost" ? "selected" : ""}>Subcontractor Cost</option><option value="Professional Fees" ${isEdit && editData.expenseCategory === "Professional Fees" ? "selected" : ""}>Professional Fees</option><option value="Transport" ${isEdit && editData.expenseCategory === "Transport" ? "selected" : ""}>Transport</option><option value="Misc" ${isEdit && editData.expenseCategory === "Misc" ? "selected" : ""}>Misc</option></select><label ${labelStyle}>Total Invoice (₦)</label><input id="pay_total_invoice" type="number" step="0.01" value="${escapeAttr(totalInvoiceValue)}" ${totalInvoiceEditable ? largeInput : largeInput + ' style="' + largeInput.split('style="')[1].split('"')[0] + '; background:#f0f0f0;"'} ${totalInvoiceEditable ? "" : "disabled"} oninput="window.recalcPaymentBalance()"><div id="pay_staging_wrap" style="display:${isSmallExpense ? "none" : "block"};"><div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-light); padding:12px; border-radius:12px; margin-top:8px; border:1.5px solid var(--border);"><span style="font-weight:700; font-size:13px;">Payments to Date</span><span id="pay_payments_to_date" style="font-weight:900; font-size:18px; color:var(--muted);">₦0.00</span></div><div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-light); padding:12px; border-radius:12px; margin-top:8px; border:1.5px solid var(--border);"><span style="font-weight:700; font-size:13px;">${currentDir === "Client Receipt" ? "Outstanding Balance" : "Balance"}</span><span id="pay_balance" style="font-weight:900; font-size:18px; color:var(--primary);">₦0.00</span></div><div style="border-top: 2px solid var(--border); margin: 16px 0;"></div><label ${labelStyle}>Stage</label><select id="pay_stage" ${largeInput}>${stageOptions}</select></div><label ${labelStyle}>${isSmallExpense ? "Amount" : "Stage Amount"} (₦)</label><input id="pay_amount" type="number" step="0.01" value="${escapeAttr(isEdit ? editData.amount : "")}" ${largeInput} oninput="window.validateStageAmount()"><p id="pay_amount_hint" style="font-size:12px; color:var(--muted); margin-top:4px; display:none;"></p><label ${labelStyle}>Method</label><select id="pay_method" ${largeInput}><option value="Cash" ${isEdit && editData.paymentMethod === "Cash" ? "selected" : ""}>Cash</option><option value="Transfer" ${!isEdit || editData.paymentMethod === "Transfer" ? "selected" : ""}>Transfer</option><option value="POS" ${isEdit && editData.paymentMethod === "POS" ? "selected" : ""}>POS</option></select><label ${labelStyle}>Notes</label><textarea id="pay_notes" rows="2" ${largeInput}>${escapeHtml(isEdit ? editData.notes : "")}</textarea><div id="paymentAttachmentsPreviews" class="modal-preview-grid" style="display:none;"></div><label class="icon-upload-label"><i class="fas fa-paperclip"></i><input type="file" id="pay_files" accept="image/*,application/pdf" multiple style="display:none"></label>${
+</select><label ${labelStyle}>Payee</label><div id="pay_payee_wrap">${payeeFieldHtml(currentDir)}</div><label ${labelStyle}>Category</label><select id="pay_cat" ${largeInput}><option value="">--</option><option value="Labour" ${isEdit && editData.expenseCategory === "Labour" ? "selected" : ""}>Labour</option><option value="Materials" ${isEdit && editData.expenseCategory === "Materials" ? "selected" : ""}>Materials</option><option value="Subcontractor Cost" ${isEdit && editData.expenseCategory === "Subcontractor Cost" ? "selected" : ""}>Subcontractor Cost</option><option value="Professional Fees" ${isEdit && editData.expenseCategory === "Professional Fees" ? "selected" : ""}>Professional Fees</option><option value="Government Fees" ${isEdit && editData.expenseCategory === "Government Fees" ? "selected" : ""}>Government Fees</option><option value="Contractor Payment" ${isEdit && editData.expenseCategory === "Contractor Payment" ? "selected" : ""}>Contractor Payment</option><option value="Transport" ${isEdit && editData.expenseCategory === "Transport" ? "selected" : ""}>Transport</option><option value="Misc" ${isEdit && editData.expenseCategory === "Misc" ? "selected" : ""}>Misc</option></select><label ${labelStyle}>Total Invoice (₦)</label><input id="pay_total_invoice" type="number" step="0.01" value="${escapeAttr(totalInvoiceValue)}" ${totalInvoiceEditable ? largeInput : largeInput + ' style="' + largeInput.split('style="')[1].split('"')[0] + '; background:#f0f0f0;"'} ${totalInvoiceEditable ? "" : "disabled"} oninput="window.recalcPaymentBalance()"><div id="pay_staging_wrap" style="display:${isSmallExpense ? "none" : "block"};"><div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-light); padding:12px; border-radius:12px; margin-top:8px; border:1.5px solid var(--border);"><span style="font-weight:700; font-size:13px;">Payments to Date</span><span id="pay_payments_to_date" style="font-weight:900; font-size:18px; color:var(--muted);">₦0.00</span></div><div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-light); padding:12px; border-radius:12px; margin-top:8px; border:1.5px solid var(--border);"><span style="font-weight:700; font-size:13px;">${currentDir === "Client Receipt" ? "Outstanding Balance" : "Balance"}</span><span id="pay_balance" style="font-weight:900; font-size:18px; color:var(--primary);">₦0.00</span></div><div style="border-top: 2px solid var(--border); margin: 16px 0;"></div><label ${labelStyle}>Stage</label><select id="pay_stage" ${largeInput}>${stageOptions}</select></div><label ${labelStyle}>${isSmallExpense ? "Amount" : "Stage Amount"} (₦)</label><input id="pay_amount" type="number" step="0.01" value="${escapeAttr(isEdit ? editData.amount : "")}" ${largeInput} oninput="window.validateStageAmount()"><p id="pay_amount_hint" style="font-size:12px; color:var(--muted); margin-top:4px; display:none;"></p><label ${labelStyle}>Method</label><select id="pay_method" ${largeInput}><option value="Cash" ${isEdit && editData.paymentMethod === "Cash" ? "selected" : ""}>Cash</option><option value="Transfer" ${!isEdit || editData.paymentMethod === "Transfer" ? "selected" : ""}>Transfer</option><option value="POS" ${isEdit && editData.paymentMethod === "POS" ? "selected" : ""}>POS</option></select><label ${labelStyle}>Notes</label><textarea id="pay_notes" rows="2" ${largeInput}>${escapeHtml(isEdit ? editData.notes : "")}</textarea><div id="paymentAttachmentsPreviews" class="modal-preview-grid" style="display:none;"></div><label class="icon-upload-label"><i class="fas fa-paperclip"></i><input type="file" id="pay_files" accept="image/*,application/pdf" multiple style="display:none"></label>${
       isElectronApp && isEdit && editData.paymentId && editData.projectId
         ? `<div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
             <strong>Desktop Attachments</strong>
@@ -1153,17 +1070,8 @@ ${projects.map((p) => `<option value="${escapeAttr(p.clientName)}" data-project-
       }
       submit.disabled = true;
       submit.innerText = "Saving...";
-      // A brand-new multi-stage payment (no existing group yet) used to
-      // invent a fake client-side id here ("PAY-GRP-" + timestamp) and
-      // send it as paymentGroupId -- but that column is a real uuid on
-      // the server, and a string like that isn't one. The backend
-      // already has the correct mechanism for this: send nothing, and
-      // it inserts the payment then self-links payment_group_id to its
-      // own real generated id. Leaving this empty (not inventing a
-      // fake value) is what actually lets that happen.
       let paymentGroupId = document.getElementById("pay_group_id").value;
 
-      // ✅ FIX: distinguish "Add Stage" (new record) from true edit
       const isRealEdit = isEdit && editData.paymentId;
 
       const payload = {
