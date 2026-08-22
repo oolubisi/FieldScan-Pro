@@ -106,34 +106,39 @@ async function generateReportPDF(orientation) {
       const imgData = canvas.toDataURL("image/jpeg", 0.72);
       const imgProps = pdf.getImageProperties(imgData);
       if (isFlowingReport) {
+        // Actually crop the source canvas into separate, correctly-sized
+        // slices -- one per page -- rather than drawing the same full
+        // (very tall) image repeatedly and relying on a PDF-level clip
+        // region to hide the overflow. That clip-based approach turned
+        // out to render as a visible bordered box on the page instead of
+        // just constraining the drawn area (jsPDF's rect()/clip()
+        // behavior here didn't match what the docs suggested), and this
+        // sidesteps that entirely: each slice is already exactly the
+        // right size, so there's nothing left to clip or accidentally
+        // draw a border around.
         const ratio = pageWidth / imgProps.width;
-        const scaledHeight = imgProps.height * ratio;
-        let heightLeft = scaledHeight;
-        let position = margin;
-        // Clip each page's drawn image to exactly the margin-bounded page
-        // area -- addImage on its own just draws the full (very tall)
-        // image at the given position with no awareness of page
-        // boundaries, so without this, content silently bled through the
-        // bottom margin of one page and the top margin of the next at
-        // every page break (the physical page edge was the only thing
-        // stopping it, not the intended margin).
-        pdf.saveGraphicsState();
-        pdf.rect(margin, margin, pageWidth, pageHeight);
-        pdf.clip();
-        pdf.discardPath();
-        pdf.addImage(imgData, "JPEG", margin, position, pageWidth, scaledHeight, undefined, "FAST");
-        pdf.restoreGraphicsState();
-        heightLeft -= pageHeight;
-        while (heightLeft > 2) {
-          pdf.addPage();
-          position = margin + heightLeft - scaledHeight;
-          pdf.saveGraphicsState();
-          pdf.rect(margin, margin, pageWidth, pageHeight);
-          pdf.clip();
-          pdf.discardPath();
-          pdf.addImage(imgData, "JPEG", margin, position, pageWidth, scaledHeight, undefined, "FAST");
-          pdf.restoreGraphicsState();
-          heightLeft -= pageHeight;
+        const pageHeightPx = pageHeight / ratio;
+        let sliceStartPx = 0;
+        let firstPage = true;
+        while (sliceStartPx < canvas.height - 1) {
+          const sliceHeightPx = Math.min(pageHeightPx, canvas.height - sliceStartPx);
+          const sliceCanvas = document.createElement("canvas");
+          sliceCanvas.width = canvas.width;
+          sliceCanvas.height = sliceHeightPx;
+          const sliceCtx = sliceCanvas.getContext("2d");
+          sliceCtx.fillStyle = "#ffffff";
+          sliceCtx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+          sliceCtx.drawImage(
+            canvas,
+            0, sliceStartPx, canvas.width, sliceHeightPx,
+            0, 0, canvas.width, sliceHeightPx,
+          );
+          const sliceImgData = sliceCanvas.toDataURL("image/jpeg", 0.72);
+          const sliceHeightMm = sliceHeightPx * ratio;
+          if (!firstPage) pdf.addPage();
+          pdf.addImage(sliceImgData, "JPEG", margin, margin, pageWidth, sliceHeightMm, undefined, "FAST");
+          firstPage = false;
+          sliceStartPx += sliceHeightPx;
         }
         continue;
       }
