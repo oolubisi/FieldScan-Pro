@@ -1049,8 +1049,9 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
         .join("")
     : `<tr><td colspan="3" style="padding:12px; text-align:center; color:#495057;">No progress logged in this period</td></tr>`;
 
-  return wrapReportPage(
-    `${await generateReportHeader("Executive Project Report", project)}
+  return `<div class="report-page-wrapper inspection-report-flow">
+    <div class="report-content">
+    ${await generateReportHeader("Executive Project Report", project)}
     <div style="font-size:13px; font-weight:700; color:#495057; margin-bottom:16px;">Reporting Period: ${escapeHtml(periodLabel)}</div>
     <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 16px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Project Snapshot</h3>
     <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px;">
@@ -1107,8 +1108,9 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
         <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Notes</th>
       </tr></thead>
       <tbody>${progressRowsHtml}</tbody>
-    </table>`,
-  );
+    </table>
+    </div>
+  </div>`;
 }
 
 async function renderFinancialClient(clientName, projects, payments) {
