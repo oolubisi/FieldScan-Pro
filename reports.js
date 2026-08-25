@@ -986,13 +986,22 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
       });
     return { paid: roundMoney(paid), pending: roundMoney(pending) };
   }
-  const presentCategories = Array.from(
-    new Set(
-      inScopeGroups
-        .filter((g) => g.direction !== "Client Receipt")
-        .map((g) => g.expenseCategory || "Uncategorized"),
-    ),
+  // Every real, selectable payment category always appears -- even at
+  // ₦0.00 if this specific project has no activity in it -- rather than
+  // only showing whichever categories happen to have a payment logged so
+  // far. Matches the payment form's own category dropdown exactly, so a
+  // category never silently goes missing just because nothing's been
+  // logged against it yet. "Uncategorized" isn't a real, selectable
+  // category -- it's a fallback for a payment left with no category
+  // chosen at all -- so it's only added if that's actually happened,
+  // not shown by default alongside the real ones.
+  const ALL_PAYMENT_CATEGORIES = ["Labour", "Materials", "Subcontractor Cost", "Professional Fees", "Government Fees", "Contractor Payment", "Transport", "Misc"];
+  const hasUncategorized = inScopeGroups.some(
+    (g) => g.direction !== "Client Receipt" && !g.expenseCategory,
   );
+  const presentCategories = hasUncategorized
+    ? [...ALL_PAYMENT_CATEGORIES, "Uncategorized"]
+    : ALL_PAYMENT_CATEGORIES;
   const categoryBreakdown = presentCategories.map((category) => ({
     category,
     ...categoryPaidAndPending(category),
@@ -1090,13 +1099,13 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     <div style="font-size:13px; font-weight:700; color:#495057; margin-bottom:16px;">Reporting Period: ${escapeHtml(periodLabel)}</div>
     <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 16px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Project Snapshot</h3>
     <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px;">
-      <div style="flex: 1 1 240px; min-width:0;">
+      <div style="flex: 1 1 240px; max-width:calc(100% - 30mm); min-width:0;">
         ${financialRowHTML("Total Invoices", totalInvoices, true, null, false)}
         ${categoryBreakdown.map((c) => financialRowHTML(`${c.category} (paid)`, c.paid, false, "var(--success)")).join("")}
         ${financialRowHTML("Pending Payments", totalPending, false, "#fd7e14")}
         ${buildPieChartLegendHtml(pieSlices)}
       </div>
-      <div style="flex: 0 0 auto; width:190px; text-align:center;">
+      <div style="flex: 0 0 auto; width:225px; text-align:center;">
         ${buildPieChartSvg(pieSlices)}
       </div>
     </div>
