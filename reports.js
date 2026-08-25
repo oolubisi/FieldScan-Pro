@@ -968,18 +968,17 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     inScopeGroups.reduce((sum, g) => sum + Math.max(0, g.balance || 0), 0),
   );
 
-  // Per-category paid/pending breakdown -- Professional Fees, Government
-  // Fees, and Misc are existing payment categories; Contractor Payment is
-  // a new category too, no longer a calculated residual (Total Invoices
-  // minus everything else), matching Government Fees and Professional
-  // Fees as a direct, selectable category on the payment form. Client
-  // Receipt groups excluded throughout -- these are expense categories,
-  // not something a client receipt would ever carry.
+  // Every category actually present among in-scope, non-Client-Receipt
+  // groups -- not just a fixed set of 4. A payment left without a
+  // category (the form's category dropdown defaults to blank) still
+  // needs to be accounted for somewhere, rather than silently vanishing
+  // from every total that's supposed to represent the whole project --
+  // grouped here under "Uncategorized" instead.
   function categoryPaidAndPending(category) {
     let paid = 0;
     let pending = 0;
     inScopeGroups
-      .filter((g) => g.direction !== "Client Receipt" && g.expenseCategory === category)
+      .filter((g) => g.direction !== "Client Receipt" && (g.expenseCategory || "Uncategorized") === category)
       .forEach((g) => {
         const relevantStages = periodRange ? g.stages.filter((s) => inRange(s.paymentDate)) : g.stages;
         paid += relevantStages.reduce((s, st) => s + (Number(st.amount) || 0), 0);
@@ -987,10 +986,17 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
       });
     return { paid: roundMoney(paid), pending: roundMoney(pending) };
   }
-  const professionalFees = categoryPaidAndPending("Professional Fees");
-  const governmentFees = categoryPaidAndPending("Government Fees");
-  const miscellaneous = categoryPaidAndPending("Misc");
-  const contractor = categoryPaidAndPending("Contractor Payment");
+  const presentCategories = Array.from(
+    new Set(
+      inScopeGroups
+        .filter((g) => g.direction !== "Client Receipt")
+        .map((g) => g.expenseCategory || "Uncategorized"),
+    ),
+  );
+  const categoryBreakdown = presentCategories.map((category) => ({
+    category,
+    ...categoryPaidAndPending(category),
+  }));
 
 
   const periodLabel = periodRange
@@ -1005,11 +1011,18 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     ? progressLogs.filter((l) => inRange(l.dateRecorded))
     : progressLogs;
 
+  // A fixed palette cycled through for however many categories actually
+  // exist on this project -- Pending Payments always gets its own
+  // dedicated color (orange), matching the "pending/warning" color used
+  // for it everywhere else in the app, rather than competing with the
+  // category palette for a slot.
+  const CATEGORY_COLOR_PALETTE = ["#0056b3", "#6f42c1", "#20c997", "#343a40", "#e83e8c", "#17a2b8", "#6610f2", "#20c997"];
   const pieSlices = [
-    { label: "Professional Fees", value: Math.abs(professionalFees.paid), color: "#0056b3" },
-    { label: "Government Fees", value: Math.abs(governmentFees.paid), color: "#6f42c1" },
-    { label: "Miscellaneous", value: Math.abs(miscellaneous.paid), color: "#20c997" },
-    { label: "Contractor", value: Math.abs(contractor.paid), color: "#343a40" },
+    ...categoryBreakdown.map((c, i) => ({
+      label: c.category,
+      value: Math.abs(c.paid),
+      color: CATEGORY_COLOR_PALETTE[i % CATEGORY_COLOR_PALETTE.length],
+    })),
     { label: "Pending Payments", value: Math.abs(totalPending), color: "#fd7e14" },
   ];
 
@@ -1079,10 +1092,7 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px;">
       <div style="flex: 1 1 240px; min-width:0;">
         ${financialRowHTML("Total Invoices", totalInvoices, true, null, false)}
-        ${financialRowHTML("Professional Fees (paid)", professionalFees.paid, false, "var(--success)")}
-        ${financialRowHTML("Government Fees (paid)", governmentFees.paid, false, "var(--success)")}
-        ${financialRowHTML("Miscellaneous (paid)", miscellaneous.paid, false, "var(--success)")}
-        ${financialRowHTML("Contractor", contractor.paid, false, "var(--success)")}
+        ${categoryBreakdown.map((c) => financialRowHTML(`${c.category} (paid)`, c.paid, false, "var(--success)")).join("")}
         ${financialRowHTML("Pending Payments", totalPending, false, "#fd7e14")}
         ${buildPieChartLegendHtml(pieSlices)}
       </div>
@@ -1097,10 +1107,7 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
         <th style="background:#000; color:#fff; text-align:right; padding:8px; font-size:10px; text-transform:uppercase;">Pending</th>
       </tr></thead>
       <tbody>
-        <tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">Professional Fees</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(professionalFees.pending)}</td></tr>
-        <tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">Government Fees</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(governmentFees.pending)}</td></tr>
-        <tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">Miscellaneous</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(miscellaneous.pending)}</td></tr>
-        <tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">Contractor</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(contractor.pending)}</td></tr>
+        ${categoryBreakdown.map((c) => `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(c.category)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(c.pending)}</td></tr>`).join("")}
       </tbody>
     </table>
     <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">This Period's Activity</h3>

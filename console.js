@@ -357,7 +357,7 @@ async function loadPaymentsListings(forceRefresh = false) {
           const key = `payment:${s.paymentId}`;
           window.modalRecordCache = window.modalRecordCache || {};
           window.modalRecordCache[key] = s;
-          return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--card-light); ${idx === g.stages.length - 1 ? "border-bottom:none;" : ""}"><div style="display:flex; align-items:center; gap:8px;"><input type="checkbox" style="width:auto; margin:0;" ${paymentSelectedIds.has(s.paymentId) ? "checked" : ""} onclick="event.stopPropagation(); window.paymentToggleSelect('${escapeAttr(s.paymentId)}')"><div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="event.stopPropagation(); window.openModalWithRecord('payment', window.modalRecordCache['${key}'])"><span style="font-size:11px; font-weight:900; background:var(--primary); color:#fff; padding:2px 8px; border-radius:4px; text-transform:uppercase;">${s.stage ? "Stage " + escapeHtml(s.stage) : "Full"}</span><span style="font-size:13px; color:var(--muted);">${escapeHtml(s.paymentDate)}</span></div></div><span style="font-size:14px; font-weight:900; color:${incoming ? "var(--success)" : "var(--danger)"}; cursor:pointer;" onclick="event.stopPropagation(); window.openModalWithRecord('payment', window.modalRecordCache['${key}'])">${incoming ? "+" : "-"}₦${moneyValue(s.amount)}</span></div>`;
+          return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--card-light); ${idx === g.stages.length - 1 ? "border-bottom:none;" : ""}"><div style="display:flex; align-items:center; gap:8px;"><input type="checkbox" style="width:auto; margin:0;" ${paymentSelectedIds.has(s.paymentId) ? "checked" : ""} onclick="event.stopPropagation(); window.paymentToggleSelect('${escapeAttr(s.paymentId)}')"><div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="event.stopPropagation(); window.openModalWithRecord('payment', window.modalRecordCache['${key}'])"><span style="font-size:11px; font-weight:900; background:var(--primary); color:#fff; padding:2px 8px; border-radius:4px; text-transform:uppercase;">${s.stage ? "Stage " + escapeHtml(s.stage) : "Full"}</span><span style="font-size:13px; color:var(--muted);">${escapeHtml(typeof ymd === "function" ? ymd(s.paymentDate) : String(s.paymentDate || "").slice(0, 10))}</span></div></div><span style="font-size:14px; font-weight:900; color:${incoming ? "var(--success)" : "var(--danger)"}; cursor:pointer;" onclick="event.stopPropagation(); window.openModalWithRecord('payment', window.modalRecordCache['${key}'])">${incoming ? "+" : "-"}₦${moneyValue(s.amount)}</span></div>`;
         })
         .join("");
       const statusText =
@@ -461,7 +461,7 @@ function paymentExportSelectedCSV() {
     if (!record) return;
     const group = groups.find((g) => g.stages.some((s) => s.paymentId === paymentId));
     rows.push({
-      date: record.paymentDate || "",
+      date: typeof ymd === "function" ? ymd(record.paymentDate) : String(record.paymentDate || "").slice(0, 10),
       payee: group ? group.payee || "" : "",
       direction: group ? group.direction || "" : "",
       stage: record.stage ? "Stage " + record.stage : "Full",
