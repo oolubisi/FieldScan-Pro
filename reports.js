@@ -181,13 +181,18 @@ async function generateReportPDF(orientation) {
   }
 }
 
-async function printReport() {
-  // Print used to require Generate to have been run first, showing an
-  // alert and refusing otherwise. Print now does both steps itself --
-  // always regenerating fresh (so what prints reflects the current data,
-  // not whatever was last generated, possibly a while ago) rather than
-  // needing a separate button click before this one would even work.
-  await compileFieldReport();
+/**
+ * Prints whatever is currently in #report-print-container as-is, with no
+ * attempt to regenerate it first. Split out from printReport() because
+ * that function always calls compileFieldReport() first, which reads the
+ * Reports page's own #rep-type-sel dropdown -- fine when printing is
+ * triggered from that page, but wrong for anything that builds and
+ * populates the print container itself first (like the Payment Voucher
+ * preview), where that dropdown is simply empty and compileFieldReport()
+ * would show its own "Select a report type" alert for no reason before
+ * falling through to print the correct, already-populated content anyway.
+ */
+async function printPreRenderedReport() {
   const container = document.getElementById("report-print-container");
   if (!container || !container.innerText.trim()) {
     alert("Could not generate the report to print. Check the report type and try again.");
@@ -236,6 +241,16 @@ async function printReport() {
   };
   window.addEventListener("afterprint", restore);
   setTimeout(() => window.print(), 50);
+}
+
+async function printReport() {
+  // Print used to require Generate to have been run first, showing an
+  // alert and refusing otherwise. Print now does both steps itself --
+  // always regenerating fresh (so what prints reflects the current data,
+  // not whatever was last generated, possibly a while ago) rather than
+  // needing a separate button click before this one would even work.
+  await compileFieldReport();
+  await printPreRenderedReport();
 }
 
 async function saveReportPDF() {
@@ -995,7 +1010,7 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
   // category -- it's a fallback for a payment left with no category
   // chosen at all -- so it's only added if that's actually happened,
   // not shown by default alongside the real ones.
-  const ALL_PAYMENT_CATEGORIES = ["Labour", "Materials", "Subcontractor Cost", "Professional Fees", "Government Fees", "Contractor Payment", "Transport", "Misc"];
+  const ALL_PAYMENT_CATEGORIES = ["Labour", "Materials", "Professional Fees", "Government Fees", "Contractor Payment", "Transport", "Misc"];
   const hasUncategorized = inScopeGroups.some(
     (g) => g.direction !== "Client Receipt" && !g.expenseCategory,
   );
@@ -1039,10 +1054,10 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     ? periodPayments
         .map(
           (p) =>
-            `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(ymd(p.paymentDate))}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.payee || p.expenseCategory || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.paymentDirection || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:center;">${escapeHtml(displayPaymentStatus(p.status) || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(p.amount)}</td></tr>`,
+            `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(ymd(p.paymentDate))}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.payee || p.expenseCategory || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.paymentDirection || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(p.amount)}</td></tr>`,
         )
         .join("")
-    : `<tr><td colspan="5" style="padding:12px; text-align:center; color:#495057;">No payment activity in this period</td></tr>`;
+    : `<tr><td colspan="4" style="padding:12px; text-align:center; color:#495057;">No payment activity in this period</td></tr>`;
 
   // Vendor balances -- grouped by payee (groups don't carry a vendorId of
   // their own, only individual payments might), summing each vendor's
@@ -1125,7 +1140,6 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
         <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Date</th>
         <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Payee / Category</th>
         <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Direction</th>
-        <th style="background:#000; color:#fff; text-align:center; padding:8px; font-size:10px; text-transform:uppercase;">Status</th>
         <th style="background:#000; color:#fff; text-align:right; padding:8px; font-size:10px; text-transform:uppercase;">Amount</th>
       </tr></thead>
       <tbody>${paymentRowsHtml}</tbody>

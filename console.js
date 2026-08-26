@@ -255,7 +255,7 @@ async function previewWorkOrderReport(workOrderId) {
     );
     if (printContainer) printContainer.innerHTML = freshHtml;
     if (isElectronApp) {
-      printReport();
+      printPreRenderedReport();
       return;
     }
     submit.disabled = true;
@@ -369,7 +369,7 @@ async function loadPaymentsListings(forceRefresh = false) {
             ? "var(--muted)"
             : "#fd7e14";
       const firstKey = g.stages.length ? `payment:${g.stages[0].paymentId}` : null;
-      return `<div class="card" style="background:#fff; border-color:#000; border-left:6px solid ${incoming ? "var(--success)" : isSmall ? "var(--muted)" : "var(--danger)"}; padding:10px 14px; ${firstKey ? "cursor:pointer;" : ""}"${firstKey ? ` onclick="window.openModalWithRecord('payment', window.modalRecordCache['${firstKey}'])"` : ""}><div style="display:flex; justify-content:space-between; align-items:center; gap:8px;"><strong style="font-size:16px;">${escapeHtml(g.payee || "Payment")}</strong><div style="display:flex; align-items:center; gap:6px; flex-shrink:0;"><span style="font-size:11px; font-weight:900; background:${statusColor}; color:#fff; padding:3px 8px; border-radius:4px; text-transform:uppercase;">${statusText}</span><i class="fas fa-trash" style="color:var(--danger); cursor:pointer; font-size:13px; padding:4px;" title="Delete this card" onclick="event.stopPropagation(); window.deletePaymentGroupWithUndo('${escapeAttr(g.paymentGroupId)}', '${escapeAttr(g.payee || "Payment")}')"></i></div></div>${stageRows ? `<div style="margin-top:4px;">${stageRows}</div>` : ""}${canAddStage ? `<button class="action-btn" style="margin-top:10px; width:auto; padding:6px 14px; font-size:12px; background:var(--primary);" onclick="event.stopPropagation(); window.openAddStageModal('${escapeAttr(g.paymentGroupId)}')"><i class="fas fa-plus"></i> Add Stage ${g.stages.length + 1}</button>` : ""}</div>`;
+      return `<div class="card" style="background:#fff; border-color:#000; border-left:6px solid ${incoming ? "var(--success)" : isSmall ? "var(--muted)" : "var(--danger)"}; padding:10px 14px; ${firstKey ? "cursor:pointer;" : ""}"${firstKey ? ` onclick="window.openModalWithRecord('payment', window.modalRecordCache['${firstKey}'])"` : ""}><div style="display:flex; justify-content:space-between; align-items:center; gap:8px;"><strong style="font-size:16px;">${escapeHtml(g.payee || "Payment")}</strong><div style="display:flex; align-items:center; gap:6px; flex-shrink:0;"><span style="font-size:11px; font-weight:900; background:${statusColor}; color:#fff; padding:3px 8px; border-radius:4px; text-transform:uppercase;">${statusText}</span>${!incoming ? `<i class="fas fa-print" style="color:var(--primary); cursor:pointer; font-size:13px; padding:4px;" title="Print payment voucher" onclick="event.stopPropagation(); window.previewPaymentVoucherReport('${escapeAttr(g.paymentGroupId)}')"></i>` : ""}<i class="fas fa-trash" style="color:var(--danger); cursor:pointer; font-size:13px; padding:4px;" title="Delete this card" onclick="event.stopPropagation(); window.deletePaymentGroupWithUndo('${escapeAttr(g.paymentGroupId)}', '${escapeAttr(g.payee || "Payment")}')"></i></div></div>${stageRows ? `<div style="margin-top:4px;">${stageRows}</div>` : ""}${canAddStage ? `<button class="action-btn" style="margin-top:10px; width:auto; padding:6px 14px; font-size:12px; background:var(--primary);" onclick="event.stopPropagation(); window.openAddStageModal('${escapeAttr(g.paymentGroupId)}')"><i class="fas fa-plus"></i> Add Stage ${g.stages.length + 1}</button>` : ""}</div>`;
     })
     .join("");
   container.innerHTML =
@@ -498,6 +498,102 @@ function csvEscape(value) {
   }
   return str;
 }
+
+/**
+ * Payment Voucher / Request -- a whole-group summary, one printed
+ * document covering every stage under this payee's invoice, not a
+ * single stage on its own. "Reason" comes from the first stage's notes
+ * (a group represents one invoice/contract, so its stages share a
+ * single underlying reason in practice). Deliberately no "Amount in
+ * Words" or disbursement/bank-details section -- FieldScan Pro doesn't
+ * store vendor bank details anywhere, so that section would have
+ * nothing real to show.
+ */
+async function renderPaymentVoucherReport(group, project) {
+  const reason = (group.stages[0] && group.stages[0].notes) || "\u2014";
+  const category = (group.stages[0] && group.stages[0].expenseCategory) || "\u2014";
+  const stageRowsHtml = group.stages
+    .map((s) => {
+      const stageLabel = s.stage ? "Stage " + escapeHtml(s.stage) : "Full Payment";
+      const dateStr = typeof ymd === "function" ? ymd(s.paymentDate) : String(s.paymentDate || "").slice(0, 10);
+      return `<tr>
+        <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${stageLabel}</td>
+        <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(dateStr)}</td>
+        <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(s.amount)}</td>
+      </tr>`;
+    })
+    .join("");
+
+  return `<div class="report-page-wrapper">
+    <div class="report-content" style="padding-bottom:22mm;">
+      ${await generateReportHeader(`PAYMENT - "${escapeHtml(group.payee || "Payment")}"`, project)}
+      <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:20px;">
+        <tbody>
+          <tr><td style="background:#f8f9fa; border:1px solid #dee2e6; padding:10px; font-weight:700; width:35%;">Category</td><td style="border:1px solid #dee2e6; padding:10px;">${escapeHtml(category)}</td></tr>
+          <tr><td style="background:#f8f9fa; border:1px solid #dee2e6; padding:10px; font-weight:700; width:35%;">Reason</td><td style="border:1px solid #dee2e6; padding:10px; white-space:pre-wrap;">${escapeHtml(reason)}</td></tr>
+          <tr><td style="background:#f8f9fa; border:1px solid #dee2e6; padding:10px; font-weight:700;">Total Contract Value</td><td style="border:1px solid #dee2e6; padding:10px; font-weight:900; font-size:15px;">\u20a6${moneyValue(group.totalInvoice)}</td></tr>
+          <tr><td style="background:#e7f3ff; border:1px solid #dee2e6; padding:10px; font-weight:700;">Total Paid</td><td style="background:#e7f3ff; border:1px solid #dee2e6; padding:10px; font-weight:900; font-size:15px;">\u20a6${moneyValue(group.paymentsToDate)}</td></tr>
+          <tr><td style="border:1px solid #dee2e6; padding:10px; font-weight:700;">Balance Remaining</td><td style="border:1px solid #dee2e6; padding:10px; font-weight:900; font-size:15px; color:${group.balance > 0 ? "#fd7e14" : "var(--success)"};">\u20a6${moneyValue(group.balance)}</td></tr>
+        </tbody>
+      </table>
+      <h3 style="font-size:14px; font-weight:900; text-transform:uppercase; margin:16px 0 8px; border-bottom:1px solid #000; padding-bottom:4px;">Payment Schedule \u2014 Staged Breakdown</h3>
+      <table class="report-table" style="width:100%; border-collapse:collapse; font-size:12px;">
+        <thead><tr>
+          <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Stage</th>
+          <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Date</th>
+          <th style="background:#000; color:#fff; text-align:right; padding:8px; font-size:10px; text-transform:uppercase;">Amount (\u20a6)</th>
+        </tr></thead>
+        <tbody>
+          ${stageRowsHtml}
+          <tr style="background:#e9ecef; font-weight:900;">
+            <td colspan="2" style="border-bottom:2px solid #000; padding:8px; font-size:12px;">Total Paid Stages</td>
+            <td style="border-bottom:2px solid #000; padding:8px; font-size:12px; text-align:right;">\u20a6${moneyValue(group.paymentsToDate)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    ${generateReportFooter()}
+  </div>`;
+}
+
+async function previewPaymentVoucherReport(paymentGroupId) {
+  const cache = getCache();
+  const projectId = getCurrentProjectId();
+  const project = (cache.projects || []).find((p) => p.projectId === projectId);
+  const group = getAllPaymentGroups(projectId).find((g) => g.paymentGroupId === paymentGroupId);
+  if (!group) return;
+
+  const body = document.getElementById("modalBody");
+  const submit = document.getElementById("modalSubmit");
+  const title = document.getElementById("modalTitle");
+  const overlay = document.getElementById("modalOverlay");
+
+  title.innerText = "Payment Voucher / Request";
+  overlay.style.display = "flex";
+
+  const html = await renderPaymentVoucherReport(group, project);
+  body.innerHTML = `<div style="max-height:60vh; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">${html}</div>`;
+  const printContainer = document.getElementById("report-print-container");
+  if (printContainer) printContainer.innerHTML = html;
+
+  submit.style.display = "block";
+  submit.innerText = isElectronApp ? "Print" : "Save PDF";
+  submit.onclick = async () => {
+    const freshHtml = await renderPaymentVoucherReport(group, project);
+    if (printContainer) printContainer.innerHTML = freshHtml;
+    if (isElectronApp) {
+      printPreRenderedReport();
+      return;
+    }
+    submit.disabled = true;
+    submit.innerText = "Generating...";
+    const pdf = await generateReportPDF("portrait");
+    if (pdf) pdf.save(`Payment_Voucher_${(group.payee || "Payment").replace(/[^a-z0-9]/gi, "_")}.pdf`);
+    submit.disabled = false;
+    submit.innerText = "Save PDF";
+  };
+}
+window.previewPaymentVoucherReport = previewPaymentVoucherReport;
 
 async function loadProgressTimelineFeed(forceRefresh = false) {
   const container = document.getElementById("console-progress-feed");
