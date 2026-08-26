@@ -260,6 +260,7 @@ window.closeFullPagePanel = closeFullPagePanel;
 function openEstimateModal(editData) {
   editData = editData || null;
   const isEdit = !!editData;
+  const isLocked = isEdit && !!editData.projectId;
   const cache = getCache();
   const settings = cache.settings && cache.settings.data ? cache.settings.data : cache.settings || {};
   const validityDays = Number(settings.EstimateValidityDays) || 7;
@@ -360,6 +361,16 @@ function openEstimateModal(editData) {
     'Show account details on printed estimate</label>' +
     '<label ' + labelStyle + '>Please Note: <span style="font-weight:400; color:var(--muted); font-size:12px;">(conditions — one per line, numbered automatically)</span></label>' +
     '<textarea id="est_conditions" rows="4" ' + largeInput + '>' + escapeHtml(isEdit ? editData.conditions || "" : "") + '</textarea>';
+
+  if (isLocked) {
+    const linkedProject = (cache.projects || []).find(function (p) { return p.projectId === editData.projectId; });
+    const projectLabel = linkedProject ? (linkedProject.displayNumber || linkedProject.projectId) : editData.projectId;
+    body.innerHTML =
+      '<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:12px 14px; margin-bottom:16px; font-size:13px; font-weight:700; color:#856404;">' +
+      '<i class="fas fa-lock"></i> This estimate has already created Project ' + escapeHtml(projectLabel) + ' and can no longer be edited.' +
+      '</div>' +
+      '<div style="pointer-events:none; opacity:0.6;">' + body.innerHTML + '</div>';
+  }
 
   renderEstLineItemsTable();
 
@@ -504,6 +515,22 @@ function openEstimateModal(editData) {
         closeFullPagePanel(panelId);
       });
     };
+  }
+
+  // Lock overrides applied last, after Save and the autosave-on-exit
+  // behavior above are both fully wired up -- otherwise either one would
+  // silently win over an earlier disabled state, since they're assigned
+  // further down in this same function.
+  if (isLocked) {
+    submit.disabled = true;
+    submit.innerText = "Locked";
+    submit.style.opacity = "0.6";
+    submit.onclick = null;
+    if (closeIcon) {
+      closeIcon.onclick = function () {
+        closeFullPagePanel(panelId);
+      };
+    }
   }
 }
 window.openEstimateModal = openEstimateModal;

@@ -2,6 +2,7 @@
 function onPaymentDirectionChange() {
   const dir = document.getElementById("pay_dir").value;
   const isSmall = dir === "Small Expense";
+  const isClientReceipt = dir === "Client Receipt";
   const stagingWrap = document.getElementById("pay_staging_wrap");
   if (stagingWrap) stagingWrap.style.display = isSmall ? "none" : "block";
   const balanceLabel = document.querySelector(
@@ -18,6 +19,29 @@ function onPaymentDirectionChange() {
       // ✅ Keep editable for Small Expense
       totalInput.disabled = false;
       totalInput.style.background = "white";
+    }
+  } else if (isClientReceipt) {
+    // A Client Receipt's "Total Invoice" isn't something the user enters
+    // directly -- it's the project's own Net Receivable (Total Contract
+    // Value minus WHT), the actual amount the client is ever expected to
+    // pay in total. Computed and locked here rather than left editable,
+    // since typing a different figure here wouldn't reflect anything
+    // real about the project's contract.
+    const totalInput = document.getElementById("pay_total_invoice");
+    if (totalInput) {
+      const cache = typeof getCache === "function" ? getCache() : {};
+      const projectId = typeof getCurrentProjectId === "function" ? getCurrentProjectId() : null;
+      const project = (cache.projects || []).find((p) => p.projectId === projectId);
+      if (project) {
+        const subtotal = roundMoney(Number(project.contractSubtotal) || 0);
+        const vat = calculateTax(subtotal, "VAT");
+        const wht = calculateTax(subtotal, "WHT");
+        const totalContract = roundMoney(subtotal + vat);
+        const netReceivable = roundMoney(totalContract - wht);
+        totalInput.value = netReceivable;
+      }
+      totalInput.disabled = true;
+      totalInput.style.background = "#f0f0f0";
     }
   } else {
     const totalInput = document.getElementById("pay_total_invoice");

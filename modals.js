@@ -1025,7 +1025,7 @@ ${projects.map((p) => `<option value="${escapeAttr(p.clientName)}" data-project-
       );
       window.onPaymentDirectionChange();
     };
-    window.recalcPaymentBalance();
+    window.onPaymentDirectionChange();
     document.getElementById("pay_amount").addEventListener("input", () => {
       if (document.getElementById("pay_dir").value === "Small Expense") {
         const amt = document.getElementById("pay_amount").value;
