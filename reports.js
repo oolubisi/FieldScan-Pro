@@ -1027,10 +1027,6 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     ? `${ymd(periodRange.start)} to ${ymd(periodRange.end)}`
     : "Entire Project";
 
-  const periodPayments = periodRange
-    ? payments.filter((p) => p.projectId === project.projectId && inRange(p.paymentDate))
-    : payments.filter((p) => p.projectId === project.projectId);
-
   const periodLogs = periodRange
     ? progressLogs.filter((l) => inRange(l.dateRecorded))
     : progressLogs;
@@ -1049,15 +1045,6 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
     })),
     { label: "Pending Payments", value: Math.abs(totalPending), color: "#fd7e14" },
   ];
-
-  const paymentRowsHtml = periodPayments.length
-    ? periodPayments
-        .map(
-          (p) =>
-            `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(ymd(p.paymentDate))}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.payee || p.expenseCategory || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(p.paymentDirection || "\u2014")}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(p.amount)}</td></tr>`,
-        )
-        .join("")
-    : `<tr><td colspan="4" style="padding:12px; text-align:center; color:#495057;">No payment activity in this period</td></tr>`;
 
   // Vendor balances -- grouped by payee (groups don't carry a vendorId of
   // their own, only individual payments might), summing each vendor's
@@ -1133,16 +1120,6 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
       <tbody>
         ${categoryBreakdown.filter((c) => c.pending > 0).map((c) => `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(c.category)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(c.pending)}</td></tr>`).join("") || `<tr><td colspan="2" style="padding:12px; text-align:center; color:#495057;">No pending payments</td></tr>`}
       </tbody>
-    </table>
-    <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">This Period's Activity</h3>
-    <table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px; margin-bottom:20px;">
-      <thead><tr>
-        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Date</th>
-        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Payee / Category</th>
-        <th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Direction</th>
-        <th style="background:#000; color:#fff; text-align:right; padding:8px; font-size:10px; text-transform:uppercase;">Amount</th>
-      </tr></thead>
-      <tbody>${paymentRowsHtml}</tbody>
     </table>
     <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">Vendor Balances</h3>
     <table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px; margin-bottom:20px;">
