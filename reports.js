@@ -1131,7 +1131,7 @@ async function renderExecutiveProjectReport(project, payments, progressLogs, per
         <th style="background:#000; color:#fff; text-align:right; padding:8px; font-size:10px; text-transform:uppercase;">Pending</th>
       </tr></thead>
       <tbody>
-        ${categoryBreakdown.map((c) => `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(c.category)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(c.pending)}</td></tr>`).join("")}
+        ${categoryBreakdown.filter((c) => c.pending > 0).map((c) => `<tr><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(c.category)}</td><td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">\u20a6${moneyValue(c.pending)}</td></tr>`).join("") || `<tr><td colspan="2" style="padding:12px; text-align:center; color:#495057;">No pending payments</td></tr>`}
       </tbody>
     </table>
     <h3 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 24px 0 8px; border-bottom: 1px solid #000; padding-bottom: 4px;">This Period's Activity</h3>
