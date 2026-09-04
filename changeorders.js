@@ -5,6 +5,31 @@
 // with the dead IIFE code that used to sit right above it.
 let coReportSelectedAttachmentIndex = 0;
 
+/**
+ * Change order line items come back from the backend already as a real
+ * array in practice (a jsonb column is auto-deserialized by the pg
+ * driver on the way out) -- but every call site here used to assume it
+ * was still a JSON string and unconditionally called JSON.parse() on it.
+ * JSON.parse() on an actual array throws (its .toString() isn't valid
+ * JSON), and every call site silently swallowed that into an empty
+ * array. That's why line items looked fine right after typing them in
+ * (still a live in-memory array, matched to save the same way in the
+ * payload) but vanished the moment the change order was reloaded from
+ * the server -- editing, reopening, printing, anywhere this ran.
+ */
+function coParseLineItems(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string" && value) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.error("coParseLineItems: failed to parse line items string", e);
+    }
+  }
+  return [];
+}
+
 // NOTE: switchConsoleSegment is defined in projects.js (loaded before changeorders.js)
 // changeorders.js just needs to export its own loader functions.
 // The console.js version will call loadChangeOrdersListings() when seg === "changeorders".
@@ -119,15 +144,7 @@ function openChangeOrderModal(editData = null) {
     ? editData.changeOrderNumber
     : getNextChangeOrderNumber(projectId);
 
-  let lineItems = [];
-  if (isEdit && editData.lineItems) {
-    try {
-      const parsed = JSON.parse(editData.lineItems);
-      if (Array.isArray(parsed)) lineItems = parsed;
-    } catch (e) {
-      lineItems = [];
-    }
-  }
+  const lineItems = isEdit ? coParseLineItems(editData.lineItems) : [];
 
   const lineItemsHtml = lineItems
     .map((item) => {
@@ -404,12 +421,7 @@ async function renderChangeOrderReport(
 ) {
   if (settings && settings.data) settings = settings.data;
 
-  let lineItems = [];
-  try {
-    lineItems = JSON.parse(changeOrder.lineItems || "[]");
-  } catch (e) {
-    lineItems = [];
-  }
+  const lineItems = coParseLineItems(changeOrder.lineItems);
 
   const itemRows = lineItems
     .map(
@@ -438,8 +450,7 @@ async function renderChangeOrderReport(
     clientSigBlock = `<div style="margin-top: 32px; page-break-inside: avoid; text-align: left; flex:1;">
       <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; color: #495057;">Client Signatory</div>
       <div style="display: inline-block; text-align: center;">
-        <div style="border-bottom: 1.5px solid #000; width: 200px; margin: 0 auto 4px auto;"></div>
-        <div style="font-size: 12px; font-weight: 700;">_________________________</div>
+        <div style="font-size: 12px; font-weight: 700;">${escapeHtml(project.clientName || "_________________________")}</div>
       </div>
     </div>`;
   }
@@ -449,7 +460,7 @@ async function renderChangeOrderReport(
       ${await generateReportHeader("Change Order", project, settings)}
       <div style="margin-bottom: 16px; font-size: 12px; line-height: 1.6;">
         <div><strong>Change Order No:</strong> ${escapeHtml(changeOrder.changeOrderNumber || changeOrder.changeOrderId)}</div>
-        <div><strong>Date:</strong> ${escapeHtml(changeOrder.date)}</div>
+        <div><strong>Date:</strong> ${escapeHtml(typeof ymd === "function" ? ymd(changeOrder.date) : String(changeOrder.date || "").slice(0, 10))}</div>
         <div><strong>Title:</strong> ${escapeHtml(changeOrder.title)}</div>
         <div><strong>Status:</strong> ${escapeHtml(changeOrder.status)}${changeOrder.approvedBy ? " · Approved by: " + escapeHtml(changeOrder.approvedBy) : ""}</div>
       </div>
@@ -653,10 +664,7 @@ async function loadPcrView() {
   } else {
     varContainer.innerHTML = projectChangeOrders
       .map((v) => {
-        let lineItems = [];
-        try {
-          lineItems = JSON.parse(v.lineItems || "[]");
-        } catch (e) {}
+        const lineItems = coParseLineItems(v.lineItems);
         return `<div style="padding:10px; background:var(--card-light); border-radius:8px; margin-bottom:8px; border:1px solid var(--border);">
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <strong style="font-size:14px;">${escapeHtml(v.changeOrderNumber || v.changeOrderId)}</strong>
