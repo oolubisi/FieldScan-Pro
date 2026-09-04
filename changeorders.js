@@ -411,7 +411,17 @@ async function renderChangeOrderReport(
     lineItems = [];
   }
 
-  const itemRows = lineItems;
+  const itemRows = lineItems
+    .map(
+      (item) =>
+        `<tr>
+          <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(item.description || "")}</td>
+          <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;">${escapeHtml(item.qty != null ? item.qty : "")}</td>
+          <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;">₦${moneyValue(item.rate)}</td>
+          <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">₦${moneyValue(item.amount)}</td>
+        </tr>`,
+    )
+    .join("");
 
   const subtotal = Number(changeOrder.subtotal) || 0;
   const vat = Number(changeOrder.vat) || 0;
@@ -454,15 +464,15 @@ async function renderChangeOrderReport(
         </thead>
         <tbody>
           ${itemRows || '<tr><td colspan="4" style="padding:20px; text-align:center; color:#495057;">No line items</td></tr>'}
-          <tr style="background:#e9ecef; font-weight:900;">
+          <tr style="font-weight:900;">
             <td colspan="3" style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;"><strong>Subtotal</strong></td>
             <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;">₦${moneyValue(subtotal)}</td>
           </tr>
-          <tr style="background:#e9ecef;">
+          <tr>
             <td colspan="3" style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;"><strong>VAT (${formatTaxRate(getTaxRate("VAT"))})</strong></td>
             <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;">₦${moneyValue(vat)}</td>
           </tr>
-          <tr style="background:#e9ecef; font-weight:900;">
+          <tr style="font-weight:900;">
             <td colspan="3" style="border-bottom:2px solid #000; padding:8px; font-size:12px; text-align:right;"><strong>TOTAL</strong></td>
             <td style="border-bottom:2px solid #000; padding:8px; font-size:12px; text-align:right; font-weight:900;">₦${moneyValue(total)}</td>
           </tr>
@@ -547,7 +557,7 @@ async function previewChangeOrderReport(changeOrderId) {
     if (printContainer) printContainer.innerHTML = html;
 
     if (isDesktop) {
-      printReport();
+      printPreRenderedReport();
       return;
     }
 

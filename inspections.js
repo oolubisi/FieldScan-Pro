@@ -426,7 +426,7 @@ async function previewInspectionReport(inspectionId) {
     const freshHtml = await renderInspectionReportDoc(insp, project);
     if (printContainer) printContainer.innerHTML = freshHtml;
     if (isElectronApp) {
-      printReport();
+      printPreRenderedReport();
       return;
     }
     submit.disabled = true;

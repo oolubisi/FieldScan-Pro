@@ -1030,7 +1030,7 @@ async function previewEstimateReport(estimateId) {
       printContainer.innerHTML = freshHtml;
     }
     if (isElectronApp) {
-      printReport();
+      printPreRenderedReport();
       return;
     }
     submit.disabled = true;

@@ -553,7 +553,7 @@ async function previewPcrReport(mode) {
   submit.onclick = async () => {
     if (printContainer) printContainer.innerHTML = html;
     if (isElectronApp) {
-      printReport();
+      printPreRenderedReport();
       return;
     }
     submit.disabled = true;
