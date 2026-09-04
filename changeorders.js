@@ -482,10 +482,8 @@ async function renderChangeOrderReport(
       ${renderAttachmentsSectionHtml(await resolveSingleAttachment(changeOrder.attachments, selectedAttachmentIndex), "Attachment")}
       <div style="display:flex; gap:24px; flex-wrap:wrap;">
         <div style="margin-top: 32px; page-break-inside: avoid; text-align: left; flex:1;">
-          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; color: #495057;">Contractor Signatory</div>
           <div style="display: inline-block; text-align: center;">
             ${signImg ? `<div style="margin-bottom: 4px;"><img src="${escapeAttr(signImg)}" style="max-height:50px; max-width:150px; object-fit:contain;" onerror="this.style.display='none'"></div>` : ""}
-            <div style="border-bottom: 1.5px solid #000; width: 200px; margin: 0 auto 4px auto;"></div>
             <div style="font-size: 12px; font-weight: 700;">${signName || "_________________________"}</div>
           </div>
         </div>

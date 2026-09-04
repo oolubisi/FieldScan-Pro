@@ -8,9 +8,9 @@ node_modules/
 backend/
 
 # OS clutter
-.DS_Store
 Thumbs.db
 
 # Build output, if you ever run electron-builder from this folder
 dist/
 out/
+.DS_Store
