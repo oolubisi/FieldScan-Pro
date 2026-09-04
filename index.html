@@ -984,6 +984,30 @@
           ></div>
         </div>
         <div class="card">
+          <h3 style="margin-bottom: 12px">Payment Payee Names</h3>
+          <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px">
+            One-time cleanup: for payments already linked to a vendor, updates
+            the payment's stored payee text to match that vendor's current
+            name. Fixes payments left showing an old name after a vendor was
+            renamed before that rename was set up to sync automatically. Safe
+            to run more than once — it only touches payments already linked to
+            a vendor; a payment with no vendor link at all needs "Link Existing
+            Payments to Vendors" above run first instead.
+          </p>
+          <button
+            id="sync-payee-names-btn"
+            class="action-btn"
+            style="width: auto; padding: 8px 16px; font-size: 13px"
+            onclick="runPaymentPayeeNameSync()"
+          >
+            <i class="fas fa-arrows-rotate"></i> Sync Payee Names to Current Vendor Names
+          </button>
+          <div
+            id="sync-payee-names-result"
+            style="font-size: 12px; color: var(--muted); margin-top: 8px"
+          ></div>
+        </div>
+        <div class="card">
           <h3 style="margin-bottom: 12px">Units of Measurement</h3>
           <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px">
             Used for the Unit dropdown on Estimate line items.
@@ -1712,7 +1736,7 @@
     <script src="accounts.js?v=12"></script>
     <script src="modals.js?v=12"></script>
     <script src="projects.js?v=1"></script>
-    <script src="dashboard.js?v=13"></script>
+    <script src="dashboard.js?v=12"></script>
     <script src="console.js?v=12"></script>
     <script src="changeorders.js?v=13"></script>
     <script src="takeoff.js?v=1"></script>
@@ -1730,6 +1754,7 @@
     <script src="search.js?v=1"></script>
     <script src="calculators.js?v=12"></script>
     <script src="photos.js?v=1"></script>
+    <script src="documents.js?v=1"></script>
     <script src="app.js?v=13"></script>
   </body>
 </html>

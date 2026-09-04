@@ -426,6 +426,31 @@ async function runPaymentVendorBackfill() {
 }
 window.runPaymentVendorBackfill = runPaymentVendorBackfill;
 
+async function runPaymentPayeeNameSync() {
+  const btn = document.getElementById("sync-payee-names-btn");
+  const resultEl = document.getElementById("sync-payee-names-result");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+  }
+  if (resultEl) resultEl.innerText = "";
+  try {
+    const resp = await callApi("syncPaymentPayeeNames", {});
+    if (resultEl) {
+      resultEl.innerText = "Updated " + resp.updated + " payment(s) to match their vendor's current name.";
+    }
+    if (typeof showSyncToast === "function") showSyncToast("✅ Payee names synced");
+  } catch (e) {
+    if (resultEl) resultEl.innerText = "Failed: " + (e.message || "Unknown error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-arrows-rotate"></i> Sync Payee Names to Current Vendor Names';
+    }
+  }
+}
+window.runPaymentPayeeNameSync = runPaymentPayeeNameSync;
+
 function savePreferences() {
   const workingFolder = document.getElementById("pref-working-folder");
   const backendUrl = document.getElementById("pref-backend-url");
