@@ -686,7 +686,7 @@ async function renderChangeOrderReport(
   // persisted per-record toggle, since change orders don't carry a
   // showAccountDetails field of their own.
   const accountDetailsHtml = includeBankDetails
-    ? '<div style="border:1px solid #000; padding:8px 12px; font-size:11px; line-height:1.7; margin-top:16px; max-width:220px;">' +
+    ? '<div style="border:1px solid #000; padding:8px 12px; font-size:11px; line-height:1.7; max-width:220px;">' +
       (settings.Account_Name ? '<div>' + escapeHtml(settings.Account_Name) + '</div>' : '') +
       (settings.Bank_Name ? '<div>' + escapeHtml(settings.Bank_Name) + '</div>' : '') +
       (settings.Account_Number ? '<div>' + escapeHtml(settings.Account_Number) + '</div>' : '') +
@@ -729,11 +729,8 @@ async function renderChangeOrderReport(
       </table>
       ${changeOrder.notes ? `<div style="margin-bottom: 16px; padding: 12px; background: #f8f9fa; border-radius: 8px; border: 1px solid #adb5bd;"><strong style="font-size: 12px; text-transform: uppercase;">Notes</strong><p style="font-size: 12px; margin-top: 4px; line-height: 1.5;">${escapeHtml(changeOrder.notes)}</p></div>` : ""}
       ${renderAttachmentsSectionHtml(await resolveSingleAttachment(changeOrder.attachments, selectedAttachmentIndex), "Attachment")}
-      ${accountDetailsHtml}
-      <div style="display:flex; gap:24px; flex-wrap:wrap;">
-        <div style="flex:1;">
-          ${signatureHtml}
-        </div>
+      <div style="display:flex; gap:24px; flex-wrap:wrap; margin-top:16px;">
+        <div style="display:flex; align-items:flex-end; gap:14px;">${signatureHtml}${accountDetailsHtml}</div>
         ${clientSigBlock}
       </div>
     </div>
