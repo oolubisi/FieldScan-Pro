@@ -30,6 +30,41 @@ function coParseLineItems(value) {
   return [];
 }
 
+/**
+ * Builds one <tr> for the Change Order line items table. type is
+ * "item" (normal, default), "header" (description only, spans where the
+ * numeric columns would be -- used to break the list into named
+ * sections), or "indented" (a normal item, just with its description
+ * padded to visually nest under a preceding header).
+ */
+function coLineItemRowHtml(item) {
+  item = item || {};
+  const type = item.type === "header" || item.type === "indented" ? item.type : "item";
+  const descStyle =
+    type === "header"
+      ? "width:100%; padding:8px; font-size:14px; font-weight:800; border:1.5px solid var(--border); border-radius:8px; background:var(--card-light);"
+      : type === "indented"
+        ? "width:100%; padding:8px 8px 8px 24px; font-size:14px; border:1.5px solid var(--border); border-radius:8px;"
+        : "width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px;";
+  const deleteBtnCell = `<td style="padding:4px; border-bottom:1px solid var(--border); width:30px; text-align:center;"><button onclick="this.closest('tr').remove(); window.recalcChangeOrderTotals();" style="background:var(--danger); color:white; border:none; border-radius:6px; cursor:pointer; width:28px; height:28px; font-size:14px;">×</button></td>`;
+
+  if (type === "header") {
+    return `<tr class="co-line-row" data-line-type="header">
+    <td colspan="4" style="padding:4px; border-bottom:1px solid var(--border);"><input class="co-line-desc" value="${escapeAttr(item.description || "")}" placeholder="Section heading" style="${descStyle}"></td>
+    ${deleteBtnCell}
+  </tr>`;
+  }
+
+  const amt = roundMoney((Number(item.qty) || 0) * (Number(item.rate) || 0));
+  return `<tr class="co-line-row" data-line-type="${type}">
+    <td style="padding:4px; border-bottom:1px solid var(--border);"><input class="co-line-desc" value="${escapeAttr(item.description || "")}" placeholder="Description" style="${descStyle}"></td>
+    <td style="padding:4px; border-bottom:1px solid var(--border); width:60px;"><input class="co-line-qty" type="number" value="${escapeAttr(item.qty != null ? item.qty : "")}" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.recalcChangeOrderTotals()"></td>
+    <td style="padding:4px; border-bottom:1px solid var(--border); width:80px;"><input class="co-line-rate" type="number" value="${escapeAttr(item.rate != null ? item.rate : "")}" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.recalcChangeOrderTotals()"></td>
+    <td style="padding:4px; border-bottom:1px solid var(--border); width:90px;"><input class="co-line-amt" type="number" value="${escapeAttr(amt)}" disabled style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right; background:#f5f5f5;"></td>
+    ${deleteBtnCell}
+  </tr>`;
+}
+
 // NOTE: switchConsoleSegment is defined in projects.js (loaded before changeorders.js)
 // changeorders.js just needs to export its own loader functions.
 // The console.js version will call loadChangeOrdersListings() when seg === "changeorders".
@@ -146,20 +181,7 @@ function openChangeOrderModal(editData = null) {
 
   const lineItems = isEdit ? coParseLineItems(editData.lineItems) : [];
 
-  const lineItemsHtml = lineItems
-    .map((item) => {
-      const amt = roundMoney(
-        (Number(item.qty) || 0) * (Number(item.rate) || 0),
-      );
-      return `<tr class="co-line-row">
-    <td style="padding:4px; border-bottom:1px solid var(--border);"><input class="co-line-desc" value="${escapeAttr(item.description || "")}" placeholder="Description" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px;"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:60px;"><input class="co-line-qty" type="number" value="${escapeAttr(item.qty != null ? item.qty : "")}" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.recalcChangeOrderTotals()"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:80px;"><input class="co-line-rate" type="number" value="${escapeAttr(item.rate != null ? item.rate : "")}" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.recalcChangeOrderTotals()"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:90px;"><input class="co-line-amt" type="number" value="${escapeAttr(amt)}" disabled style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right; background:#f5f5f5;"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:30px; text-align:center;"><button onclick="this.closest('tr').remove(); window.recalcChangeOrderTotals();" style="background:var(--danger); color:white; border:none; border-radius:6px; cursor:pointer; width:28px; height:28px; font-size:14px;">×</button></td>
-  </tr>`;
-    })
-    .join("");
+  const lineItemsHtml = lineItems.map(coLineItemRowHtml).join("");
 
   title.innerText = isEdit ? "Edit Change Order" : "New Change Order";
   body.innerHTML = `
@@ -194,9 +216,16 @@ function openChangeOrderModal(editData = null) {
       </thead>
       <tbody id="co_line_items_body">${lineItemsHtml}</tbody>
     </table>
-    <button class="action-btn" style="width:auto; padding:6px 12px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.addChangeOrderLineItem()">
-      <i class="fas fa-plus"></i> Add Line Item
-    </button>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <select id="co_add_line_type" style="padding:6px 8px; font-size:12px; border:1.5px solid var(--border); border-radius:8px;">
+        <option value="item">Line Item</option>
+        <option value="header">Line Header</option>
+        <option value="indented">Indented Line</option>
+      </select>
+      <button class="action-btn" style="width:auto; padding:6px 12px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.addChangeOrderLineItem()">
+        <i class="fas fa-plus"></i> Add
+      </button>
+    </div>
 
     <div style="margin-top:16px; padding:12px; background:var(--card-light); border-radius:12px; border:1.5px solid var(--border);">
       <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
@@ -287,16 +316,21 @@ function openChangeOrderModal(editData = null) {
     const lineItems = [];
     rows.forEach((row) => {
       const desc = row.querySelector(".co-line-desc").value.trim();
-      if (desc) {
-        const qty = Number(row.querySelector(".co-line-qty").value) || 0;
-        const rate = Number(row.querySelector(".co-line-rate").value) || 0;
-        lineItems.push({
-          description: desc,
-          qty: qty,
-          rate: rate,
-          amount: roundMoney(qty * rate),
-        });
+      if (!desc) return;
+      const type = row.dataset.lineType === "header" ? "header" : row.dataset.lineType === "indented" ? "indented" : "item";
+      if (type === "header") {
+        lineItems.push({ description: desc, type: "header" });
+        return;
       }
+      const qty = Number(row.querySelector(".co-line-qty").value) || 0;
+      const rate = Number(row.querySelector(".co-line-rate").value) || 0;
+      lineItems.push({
+        description: desc,
+        qty: qty,
+        rate: rate,
+        amount: roundMoney(qty * rate),
+        type: type,
+      });
     });
 
     if (!lineItems.length) {
@@ -304,7 +338,7 @@ function openChangeOrderModal(editData = null) {
       return;
     }
 
-    const subtotal = lineItems.reduce((s, i) => s + i.amount, 0);
+    const subtotal = lineItems.reduce((s, i) => s + (Number(i.amount) || 0), 0);
     const vat = calculateTax(subtotal, "VAT");
     const total = roundMoney(subtotal + vat);
 
@@ -378,20 +412,18 @@ function openChangeOrderModal(editData = null) {
 function addChangeOrderLineItem() {
   const tbody = document.getElementById("co_line_items_body");
   if (!tbody) return;
-  const row = document.createElement("tr");
-  row.className = "co-line-row";
-  row.innerHTML = `<td style="padding:4px; border-bottom:1px solid var(--border);"><input class="co-line-desc" value="" placeholder="Description" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px;"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:60px;"><input class="co-line-qty" type="number" value="" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.recalcChangeOrderTotals()"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:80px;"><input class="co-line-rate" type="number" value="" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.recalcChangeOrderTotals()"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:90px;"><input class="co-line-amt" type="number" value="0" disabled style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right; background:#f5f5f5;"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:30px; text-align:center;"><button onclick="this.closest('tr').remove(); window.recalcChangeOrderTotals();" style="background:var(--danger); color:white; border:none; border-radius:6px; cursor:pointer; width:28px; height:28px; font-size:14px;">×</button></td>`;
-  tbody.appendChild(row);
+  const typeSel = document.getElementById("co_add_line_type");
+  const type = typeSel ? typeSel.value : "item";
+  const wrapper = document.createElement("tbody");
+  wrapper.innerHTML = coLineItemRowHtml({ type });
+  tbody.appendChild(wrapper.firstElementChild);
 }
 
 function recalcChangeOrderTotals() {
   const rows = document.querySelectorAll("#co_line_items_body tr");
   let subtotal = 0;
   rows.forEach((row) => {
+    if (row.dataset.lineType === "header") return;
     const qty = Number(row.querySelector(".co-line-qty").value) || 0;
     const rate = Number(row.querySelector(".co-line-rate").value) || 0;
     const amt = roundMoney(qty * rate);
@@ -424,15 +456,20 @@ async function renderChangeOrderReport(
   const lineItems = coParseLineItems(changeOrder.lineItems);
 
   const itemRows = lineItems
-    .map(
-      (item) =>
-        `<tr>
-          <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(item.description || "")}</td>
+    .map((item) => {
+      if (item.type === "header") {
+        return `<tr>
+          <td colspan="4" style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; font-weight:800;">${escapeHtml(item.description || "")}</td>
+        </tr>`;
+      }
+      const descPadding = item.type === "indented" ? "padding:8px 8px 8px 24px;" : "padding:8px;";
+      return `<tr>
+          <td style="border-bottom:1px solid #adb5bd; ${descPadding} font-size:12px;">${escapeHtml(item.description || "")}</td>
           <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;">${escapeHtml(item.qty != null ? item.qty : "")}</td>
           <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;">₦${moneyValue(item.rate)}</td>
           <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">₦${moneyValue(item.amount)}</td>
-        </tr>`,
-    )
+        </tr>`;
+    })
     .join("");
 
   const subtotal = Number(changeOrder.subtotal) || 0;

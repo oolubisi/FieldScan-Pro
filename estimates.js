@@ -339,7 +339,12 @@ function openEstimateModal(editData) {
     '<th style="text-align:right; padding:6px; font-size:10px; text-transform:uppercase; width:100px;">Amount</th>' +
     '<th style="width:30px;"></th></tr></thead><tbody id="est_line_items_body"></tbody></table></div>' +
     '<div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">' +
-    '<button type="button" class="action-btn" style="width:auto; padding:8px 14px; font-size:12px;" onclick="window.estAddLineItem()"><i class="fas fa-plus"></i> Add Line</button>' +
+    '<select id="est_add_line_type" style="padding:8px; font-size:12px; border:1.5px solid var(--border); border-radius:8px;">' +
+    '<option value="item">Line Item</option>' +
+    '<option value="header">Line Header</option>' +
+    '<option value="indented">Indented Line</option>' +
+    '</select>' +
+    '<button type="button" class="action-btn" style="width:auto; padding:8px 14px; font-size:12px;" onclick="window.estAddLineItem()"><i class="fas fa-plus"></i> Add</button>' +
     '<button type="button" class="action-btn" style="width:auto; padding:8px 14px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.estOpenGroupPicker()"><i class="fas fa-layer-group"></i> Add Group Block</button>' +
     '<button type="button" class="action-btn" style="width:auto; padding:8px 14px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.estAddBlankGroup()"><i class="fas fa-plus"></i> Add Blank Group</button>' +
     '</div>' +
@@ -630,11 +635,29 @@ function estRowDrop(ev, targetIndex) {
 window.estRowDrop = estRowDrop;
 
 function estLineRowHtml(item, index) {
+  const type = item.type === "header" || item.type === "indented" ? item.type : "item";
+
+  if (type === "header") {
+    return (
+      '<tr style="position:relative;" ondragover="window.estRowDragOver(event)" ondrop="window.estRowDrop(event, ' + index + ')" onfocusin="window.estSetLastFocusedIndex(' + index + ')">' +
+      '<td colspan="5" style="padding:4px; border-bottom:1px solid var(--border);">' +
+      '<div style="display:flex; align-items:center; gap:6px;">' +
+      '<i class="fas fa-grip-vertical" draggable="true" ondragstart="window.estRowDragStart(event, ' + index + ')" style="color:var(--muted); cursor:grab; flex-shrink:0;" title="Drag to reorder"></i>' +
+      '<input value="' + escapeAttr(item.description || "") + '" placeholder="Section heading" style="flex:1; padding:6px; font-size:13px; font-weight:800; border:1px solid var(--border); border-radius:6px; background:var(--card-light);" ' +
+      'oninput="window.estUpdateLineField(' + index + ", 'description', this.value)\" onfocus=\"window.estSetLastFocusedIndex(" + index + ')">' +
+      '</div>' +
+      '</td>' +
+      '<td style="padding:4px; border-bottom:1px solid var(--border); text-align:center;"><span onclick="window.estRemoveLineItem(' + index + ')" style="cursor:pointer; color:var(--danger);"><i class="fas fa-trash"></i></span></td>' +
+      '</tr>'
+    );
+  }
+
   const amt = roundMoney((Number(item.qty) || 0) * (Number(item.unitPrice) || 0));
+  const descPaddingLeft = type === "indented" ? "24px" : "0";
   return (
     '<tr style="position:relative;" ondragover="window.estRowDragOver(event)" ondrop="window.estRowDrop(event, ' + index + ')" onfocusin="window.estSetLastFocusedIndex(' + index + ')">' +
     '<td style="padding:4px; border-bottom:1px solid var(--border); position:relative;">' +
-    '<div style="display:flex; align-items:center; gap:6px;">' +
+    '<div style="display:flex; align-items:center; gap:6px; padding-left:' + descPaddingLeft + ';">' +
     '<i class="fas fa-grip-vertical" draggable="true" ondragstart="window.estRowDragStart(event, ' + index + ')" style="color:var(--muted); cursor:grab; flex-shrink:0;" title="Drag to reorder"></i>' +
     '<div style="flex:1; position:relative;">' +
     '<input value="' + escapeAttr(item.description || "") + '" placeholder="Search BOQ or type a new item..." style="width:100%; padding:6px; font-size:13px; border:1px solid var(--border); border-radius:6px;" ' +
@@ -689,7 +712,12 @@ function estGetGroupBoundaryInsertPosition() {
 function estAddLineItem() {
   const insertAt = estGetInsertPosition();
   const inheritedGroup = insertAt > 0 ? currentEstimateLineItems[insertAt - 1].groupName || null : null;
-  currentEstimateLineItems.splice(insertAt, 0, { groupName: inheritedGroup, description: "", qty: 1, unit: "", unitPrice: 0 });
+  const typeSel = document.getElementById("est_add_line_type");
+  const type = typeSel ? typeSel.value : "item";
+  const newItem = type === "header"
+    ? { groupName: inheritedGroup, description: "", type: "header" }
+    : { groupName: inheritedGroup, description: "", qty: 1, unit: "", unitPrice: 0, type: type };
+  currentEstimateLineItems.splice(insertAt, 0, newItem);
   estLastFocusedIndex = insertAt;
   renderEstLineItemsTable();
 }
@@ -1060,8 +1088,13 @@ async function renderEstimateReportDoc(est) {
   const totals = estComputeTotals(lineItems, mode, discountAmount, discountEnabled);
 
   function rowHtml(item) {
+    const type = item.type === "header" || item.type === "indented" ? item.type : "item";
+    if (type === "header") {
+      return '<tr><td colspan="5" style="padding:6px; font-size:12px; font-weight:800;">' + escapeHtml(item.description || "") + '</td></tr>';
+    }
+    const descPadding = type === "indented" ? "padding:6px 6px 6px 24px;" : "padding:6px;";
     return (
-      '<tr><td style="padding:6px; font-size:12px; vertical-align:top;">' + escapeHtml(item.description || "") + '</td>' +
+      '<tr><td style="' + descPadding + ' font-size:12px; vertical-align:top;">' + escapeHtml(item.description || "") + '</td>' +
       '<td style="padding:6px; font-size:12px; text-align:right; vertical-align:top;">' + escapeHtml(item.qty != null ? item.qty : "") + '</td>' +
       '<td style="padding:6px; font-size:12px; vertical-align:top;">' + escapeHtml(item.unit || "") + '</td>' +
       '<td style="padding:6px; font-size:12px; text-align:right; vertical-align:top;">₦' + moneyValue(item.unitPrice) + '</td>' +
