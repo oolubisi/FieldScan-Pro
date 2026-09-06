@@ -339,14 +339,16 @@ function openEstimateModal(editData) {
     '<th style="text-align:right; padding:6px; font-size:10px; text-transform:uppercase; width:100px;">Amount</th>' +
     '<th style="width:30px;"></th></tr></thead><tbody id="est_line_items_body"></tbody></table></div>' +
     '<div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">' +
-    '<select id="est_add_line_type" style="padding:8px; font-size:12px; border:1.5px solid var(--border); border-radius:8px;">' +
-    '<option value="item">Line Item</option>' +
-    '<option value="header">Line Header</option>' +
-    '<option value="indented">Indented Line</option>' +
-    '</select>' +
-    '<button type="button" class="action-btn" style="width:auto; padding:8px 14px; font-size:12px;" onclick="window.estAddLineItem()"><i class="fas fa-plus"></i> Add</button>' +
-    '<button type="button" class="action-btn" style="width:auto; padding:8px 14px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.estOpenGroupPicker()"><i class="fas fa-layer-group"></i> Add Group Block</button>' +
-    '<button type="button" class="action-btn" style="width:auto; padding:8px 14px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.estAddBlankGroup()"><i class="fas fa-plus"></i> Add Blank Group</button>' +
+    '<div style="position:relative; display:inline-block; margin-top:8px;">' +
+    '<button type="button" class="action-btn" style="width:auto; padding:8px 14px; font-size:12px;" onclick="window.estToggleAddMenu(event)"><i class="fas fa-plus"></i> Add</button>' +
+    '<div id="est_add_menu" style="display:none; position:absolute; top:100%; left:0; margin-top:4px; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.18); z-index:50; min-width:170px; overflow:hidden;">' +
+    '<div class="est-add-menu-item" onclick="window.estAddMenuAction(\'item\')" style="padding:10px 14px; font-size:13px; cursor:pointer;">Line Item</div>' +
+    '<div class="est-add-menu-item" onclick="window.estAddMenuAction(\'indented\')" style="padding:10px 14px; font-size:13px; cursor:pointer;">Indented Line</div>' +
+    '<div class="est-add-menu-item" onclick="window.estAddMenuAction(\'header\')" style="padding:10px 14px; font-size:13px; cursor:pointer;">Header</div>' +
+    '<div class="est-add-menu-item" onclick="window.estAddMenuAction(\'groupBlock\')" style="padding:10px 14px; font-size:13px; cursor:pointer; border-top:1px solid var(--border);"><i class="fas fa-layer-group"></i> Add Group Block</div>' +
+    '<div class="est-add-menu-item" onclick="window.estAddMenuAction(\'blankGroup\')" style="padding:10px 14px; font-size:13px; cursor:pointer;">Add Blank Group</div>' +
+    '</div>' +
+    '</div>' +
     '</div>' +
     '<div style="max-width:340px; margin:16px 0 0 auto;">' +
     '<div style="display:flex; justify-content:space-between; padding:4px 0; font-size:13px;"><span>Subtotal</span><span id="est-disp-subtotal">₦0.00</span></div>' +
@@ -709,11 +711,10 @@ function estGetGroupBoundaryInsertPosition() {
   return lastIdx + 1;
 }
 
-function estAddLineItem() {
+function estAddLineItem(type) {
+  type = type === "header" || type === "indented" ? type : "item";
   const insertAt = estGetInsertPosition();
   const inheritedGroup = insertAt > 0 ? currentEstimateLineItems[insertAt - 1].groupName || null : null;
-  const typeSel = document.getElementById("est_add_line_type");
-  const type = typeSel ? typeSel.value : "item";
   const newItem = type === "header"
     ? { groupName: inheritedGroup, description: "", type: "header" }
     : { groupName: inheritedGroup, description: "", qty: 1, unit: "", unitPrice: 0, type: type };
@@ -722,6 +723,39 @@ function estAddLineItem() {
   renderEstLineItemsTable();
 }
 window.estAddLineItem = estAddLineItem;
+
+function estToggleAddMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById("est_add_menu");
+  if (!menu) return;
+  const opening = menu.style.display === "none";
+  menu.style.display = opening ? "block" : "none";
+  if (opening) {
+    const closeOnOutsideClick = function (e) {
+      if (!menu.contains(e.target)) {
+        menu.style.display = "none";
+        document.removeEventListener("click", closeOnOutsideClick);
+      }
+    };
+    setTimeout(() => document.addEventListener("click", closeOnOutsideClick), 0);
+  }
+}
+window.estToggleAddMenu = estToggleAddMenu;
+
+function estAddMenuAction(action) {
+  const menu = document.getElementById("est_add_menu");
+  if (menu) menu.style.display = "none";
+  if (action === "groupBlock") {
+    estOpenGroupPicker();
+    return;
+  }
+  if (action === "blankGroup") {
+    estAddBlankGroup();
+    return;
+  }
+  estAddLineItem(action);
+}
+window.estAddMenuAction = estAddMenuAction;
 
 function estRemoveLineItem(index) {
   currentEstimateLineItems.splice(index, 1);

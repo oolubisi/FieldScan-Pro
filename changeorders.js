@@ -30,14 +30,55 @@ function coParseLineItems(value) {
   return [];
 }
 
+let currentChangeOrderLineItems = [];
+let coLastFocusedIndex = -1;
+
+function coSetLastFocusedIndex(index) {
+  coLastFocusedIndex = index;
+}
+window.coSetLastFocusedIndex = coSetLastFocusedIndex;
+
+function coGetInsertPosition() {
+  if (coLastFocusedIndex >= 0 && coLastFocusedIndex < currentChangeOrderLineItems.length) {
+    return coLastFocusedIndex + 1;
+  }
+  return currentChangeOrderLineItems.length;
+}
+
+/** Same convention as estimates: a new group lands after the entire
+ * current group's last member, not just after the focused row, so it
+ * can't end up spliced into the middle of the group being worked on. */
+function coGetGroupBoundaryInsertPosition() {
+  if (coLastFocusedIndex < 0 || coLastFocusedIndex >= currentChangeOrderLineItems.length) {
+    return currentChangeOrderLineItems.length;
+  }
+  const focusedGroup = currentChangeOrderLineItems[coLastFocusedIndex].groupName || null;
+  if (!focusedGroup) return coLastFocusedIndex + 1;
+  let lastIdx = coLastFocusedIndex;
+  currentChangeOrderLineItems.forEach((it, i) => {
+    if ((it.groupName || null) === focusedGroup) lastIdx = i;
+  });
+  return lastIdx + 1;
+}
+
+function coGroupNameExists(name) {
+  return currentChangeOrderLineItems.some((it) => (it.groupName || "").toLowerCase() === name.toLowerCase());
+}
+
 /**
  * Builds one <tr> for the Change Order line items table. type is
  * "item" (normal, default), "header" (description only, spans where the
  * numeric columns would be -- used to break the list into named
  * sections), or "indented" (a normal item, just with its description
- * padded to visually nest under a preceding header).
+ * padded to visually nest under a preceding header). Unlike the earlier
+ * version of this function, rows are now index-addressed against
+ * currentChangeOrderLineItems (via coUpdateLineField) rather than
+ * queried directly from the DOM at save time -- required for grouping,
+ * since a group's own subtotal has to be recomputed and the whole table
+ * re-rendered whenever any line in it changes, not just read once at
+ * the end.
  */
-function coLineItemRowHtml(item) {
+function coLineItemRowHtml(item, index) {
   item = item || {};
   const type = item.type === "header" || item.type === "indented" ? item.type : "item";
   const descStyle =
@@ -46,24 +87,122 @@ function coLineItemRowHtml(item) {
       : type === "indented"
         ? "width:100%; padding:8px 8px 8px 24px; font-size:14px; border:1.5px solid var(--border); border-radius:8px;"
         : "width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px;";
-  const deleteBtnCell = `<td style="padding:4px; border-bottom:1px solid var(--border); width:30px; text-align:center;"><button onclick="this.closest('tr').remove(); window.recalcChangeOrderTotals();" style="background:var(--danger); color:white; border:none; border-radius:6px; cursor:pointer; width:28px; height:28px; font-size:14px;">×</button></td>`;
+  const deleteBtnCell = `<td style="padding:4px; border-bottom:1px solid var(--border); width:30px; text-align:center;"><button onclick="window.coRemoveLineItem(${index})" style="background:var(--danger); color:white; border:none; border-radius:6px; cursor:pointer; width:28px; height:28px; font-size:14px;">×</button></td>`;
 
   if (type === "header") {
-    return `<tr class="co-line-row" data-line-type="header">
-    <td colspan="4" style="padding:4px; border-bottom:1px solid var(--border);"><input class="co-line-desc" value="${escapeAttr(item.description || "")}" placeholder="Section heading" style="${descStyle}"></td>
+    return `<tr class="co-line-row" onfocusin="window.coSetLastFocusedIndex(${index})">
+    <td colspan="4" style="padding:4px; border-bottom:1px solid var(--border);"><input value="${escapeAttr(item.description || "")}" placeholder="Section heading" style="${descStyle}" oninput="window.coUpdateLineField(${index}, 'description', this.value)"></td>
     ${deleteBtnCell}
   </tr>`;
   }
 
   const amt = roundMoney((Number(item.qty) || 0) * (Number(item.rate) || 0));
-  return `<tr class="co-line-row" data-line-type="${type}">
-    <td style="padding:4px; border-bottom:1px solid var(--border);"><input class="co-line-desc" value="${escapeAttr(item.description || "")}" placeholder="Description" style="${descStyle}"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:60px;"><input class="co-line-qty" type="number" value="${escapeAttr(item.qty != null ? item.qty : "")}" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.recalcChangeOrderTotals()"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:80px;"><input class="co-line-rate" type="number" value="${escapeAttr(item.rate != null ? item.rate : "")}" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.recalcChangeOrderTotals()"></td>
-    <td style="padding:4px; border-bottom:1px solid var(--border); width:90px;"><input class="co-line-amt" type="number" value="${escapeAttr(amt)}" disabled style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right; background:#f5f5f5;"></td>
+  return `<tr class="co-line-row" onfocusin="window.coSetLastFocusedIndex(${index})">
+    <td style="padding:4px; border-bottom:1px solid var(--border);"><input value="${escapeAttr(item.description || "")}" placeholder="Description" style="${descStyle}" oninput="window.coUpdateLineField(${index}, 'description', this.value)"></td>
+    <td style="padding:4px; border-bottom:1px solid var(--border); width:60px;"><input type="number" value="${escapeAttr(item.qty != null ? item.qty : "")}" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.coUpdateLineField(${index}, 'qty', this.value)"></td>
+    <td style="padding:4px; border-bottom:1px solid var(--border); width:80px;"><input type="number" value="${escapeAttr(item.rate != null ? item.rate : "")}" min="0" step="0.01" style="width:100%; padding:8px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; text-align:right;" oninput="window.coUpdateLineField(${index}, 'rate', this.value)"></td>
+    <td id="co-amt-${index}" style="padding:4px; border-bottom:1px solid var(--border); width:90px; text-align:right; font-weight:700; font-size:14px;">₦${moneyValue(amt)}</td>
     ${deleteBtnCell}
   </tr>`;
 }
+
+function coUpdateLineField(index, field, value) {
+  if (!currentChangeOrderLineItems[index]) return;
+  currentChangeOrderLineItems[index][field] = (field === "qty" || field === "rate") ? (Number(value) || 0) : value;
+  if (field === "qty" || field === "rate") {
+    const item = currentChangeOrderLineItems[index];
+    const amt = roundMoney((Number(item.qty) || 0) * (Number(item.rate) || 0));
+    const amtCell = document.getElementById("co-amt-" + index);
+    if (amtCell) amtCell.innerText = "₦" + moneyValue(amt);
+    recalcChangeOrderTotals();
+  }
+}
+window.coUpdateLineField = coUpdateLineField;
+
+function coRemoveLineItem(index) {
+  currentChangeOrderLineItems.splice(index, 1);
+  renderCoLineItemsTable();
+}
+window.coRemoveLineItem = coRemoveLineItem;
+
+/**
+ * Central re-render for the Change Order line items table -- always
+ * rendered in the same "mixed" layout regardless of whether any groups
+ * exist yet: items with no groupName render inline in original order,
+ * and any groupName that appears gets its own heading + subtotal row,
+ * with all of that group's members shown together underneath it
+ * (grouped by name, not by their position in the array -- same
+ * convention estimates.js already uses).
+ */
+function renderCoLineItemsTable() {
+  const tbody = document.getElementById("co_line_items_body");
+  if (!tbody) return;
+
+  let rowsHtml = "";
+  const seenGroups = [];
+  currentChangeOrderLineItems.forEach((item) => {
+    const g = item.groupName || "";
+    if (seenGroups.indexOf(g) === -1) seenGroups.push(g);
+  });
+  seenGroups.forEach((g) => {
+    if (g) {
+      rowsHtml += `<tr><td colspan="4" style="padding:8px 4px 4px;"><span style="font-weight:800; text-decoration:underline; font-size:13px;">${escapeHtml(g)}</span></td><td></td></tr>`;
+    }
+    currentChangeOrderLineItems.forEach((item, idx) => {
+      if ((item.groupName || "") === g) rowsHtml += coLineItemRowHtml(item, idx);
+    });
+    if (g) {
+      const groupTotal = currentChangeOrderLineItems
+        .filter((item) => (item.groupName || "") === g)
+        .reduce((s, item) => roundMoney(s + (Number(item.qty) || 0) * (Number(item.rate) || 0)), 0);
+      rowsHtml += `<tr><td colspan="3" style="text-align:right; padding:4px; font-weight:700; font-size:12px; color:var(--muted);">Group Subtotal</td><td style="text-align:right; padding:4px; font-weight:700; font-size:12px;">₦${moneyValue(groupTotal)}</td><td></td></tr>`;
+    }
+  });
+
+  tbody.innerHTML = rowsHtml || '<tr><td colspan="5" style="text-align:center; padding:14px; color:var(--muted); font-size:12px;">No line items yet.</td></tr>';
+  recalcChangeOrderTotals();
+}
+window.renderCoLineItemsTable = renderCoLineItemsTable;
+
+function coAddBlankGroup() {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9000; display:flex; align-items:center; justify-content:center;";
+  overlay.innerHTML =
+    '<div style="background:#fff; border-radius:12px; padding:20px; max-width:360px; width:90%;">' +
+    '<h3 style="margin-top:0;">Name This Group</h3>' +
+    '<input id="co-blank-group-name-input" placeholder="e.g. Miscellaneous" style="width:100%; padding:10px; font-size:14px; border:1.5px solid var(--border); border-radius:8px;">' +
+    '<div style="display:flex; gap:8px; margin-top:14px;">' +
+    '<button type="button" class="action-btn co-blank-group-cancel" style="background:var(--card-light); color:var(--text);">Cancel</button>' +
+    '<button type="button" class="action-btn co-blank-group-confirm">Add Group</button>' +
+    '</div></div>';
+  document.body.appendChild(overlay);
+
+  const input = overlay.querySelector("#co-blank-group-name-input");
+  input.focus();
+
+  const confirmAdd = function () {
+    const name = input.value.trim();
+    if (!name) return;
+    if (coGroupNameExists(name)) {
+      alert('"' + name + '" has already been added to this change order. Choose a different name.');
+      return;
+    }
+    const insertAt = coGetGroupBoundaryInsertPosition();
+    currentChangeOrderLineItems.splice(insertAt, 0, { groupName: name, description: "", qty: 1, rate: 0, type: "item" });
+    coLastFocusedIndex = insertAt;
+    renderCoLineItemsTable();
+    overlay.remove();
+  };
+
+  overlay.querySelector(".co-blank-group-cancel").onclick = function () { overlay.remove(); };
+  overlay.querySelector(".co-blank-group-confirm").onclick = confirmAdd;
+  input.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter") confirmAdd();
+  });
+}
+window.coAddBlankGroup = coAddBlankGroup;
+
+
 
 // NOTE: switchConsoleSegment is defined in projects.js (loaded before changeorders.js)
 // changeorders.js just needs to export its own loader functions.
@@ -179,9 +318,8 @@ function openChangeOrderModal(editData = null) {
     ? editData.changeOrderNumber
     : getNextChangeOrderNumber(projectId);
 
-  const lineItems = isEdit ? coParseLineItems(editData.lineItems) : [];
-
-  const lineItemsHtml = lineItems.map(coLineItemRowHtml).join("");
+  currentChangeOrderLineItems = isEdit ? coParseLineItems(editData.lineItems) : [];
+  coLastFocusedIndex = -1;
 
   title.innerText = isEdit ? "Edit Change Order" : "New Change Order";
   body.innerHTML = `
@@ -214,17 +352,18 @@ function openChangeOrderModal(editData = null) {
           <th style="width:30px;"></th>
         </tr>
       </thead>
-      <tbody id="co_line_items_body">${lineItemsHtml}</tbody>
+      <tbody id="co_line_items_body"></tbody>
     </table>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <select id="co_add_line_type" style="padding:6px 8px; font-size:12px; border:1.5px solid var(--border); border-radius:8px;">
-        <option value="item">Line Item</option>
-        <option value="header">Line Header</option>
-        <option value="indented">Indented Line</option>
-      </select>
-      <button class="action-btn" style="width:auto; padding:6px 12px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.addChangeOrderLineItem()">
+    <div style="position:relative; display:inline-block;">
+      <button class="action-btn" style="width:auto; padding:6px 12px; font-size:12px; background:var(--card-light); color:var(--text);" onclick="window.coToggleAddMenu(event)">
         <i class="fas fa-plus"></i> Add
       </button>
+      <div id="co_add_menu" style="display:none; position:absolute; top:100%; left:0; margin-top:4px; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.18); z-index:50; min-width:160px; overflow:hidden;">
+        <div class="co-add-menu-item" onclick="window.coAddMenuAction('item')" style="padding:10px 14px; font-size:13px; cursor:pointer;">Line Item</div>
+        <div class="co-add-menu-item" onclick="window.coAddMenuAction('indented')" style="padding:10px 14px; font-size:13px; cursor:pointer;">Indented Line</div>
+        <div class="co-add-menu-item" onclick="window.coAddMenuAction('header')" style="padding:10px 14px; font-size:13px; cursor:pointer;">Header</div>
+        <div class="co-add-menu-item" onclick="window.coAddMenuAction('group')" style="padding:10px 14px; font-size:13px; cursor:pointer; border-top:1px solid var(--border);">Group</div>
+      </div>
     </div>
 
     <div style="margin-top:16px; padding:12px; background:var(--card-light); border-radius:12px; border:1.5px solid var(--border);">
@@ -257,6 +396,8 @@ function openChangeOrderModal(editData = null) {
 
     ${isEdit ? `<button class="action-btn" id="co_delete_btn" style="background:var(--danger); margin-top:10px;">Delete Change Order</button>` : ""}
   `;
+
+  renderCoLineItemsTable();
 
   if (currentModalFiles.length)
     populateModalInlineImageGalleryPreviews("changeOrderAttachmentsPreviews");
@@ -312,26 +453,20 @@ function openChangeOrderModal(editData = null) {
       return;
     }
 
-    const rows = document.querySelectorAll("#co_line_items_body tr");
-    const lineItems = [];
-    rows.forEach((row) => {
-      const desc = row.querySelector(".co-line-desc").value.trim();
-      if (!desc) return;
-      const type = row.dataset.lineType === "header" ? "header" : row.dataset.lineType === "indented" ? "indented" : "item";
-      if (type === "header") {
-        lineItems.push({ description: desc, type: "header" });
-        return;
-      }
-      const qty = Number(row.querySelector(".co-line-qty").value) || 0;
-      const rate = Number(row.querySelector(".co-line-rate").value) || 0;
-      lineItems.push({
-        description: desc,
-        qty: qty,
-        rate: rate,
-        amount: roundMoney(qty * rate),
-        type: type,
+    const lineItems = currentChangeOrderLineItems
+      .filter((item) => (item.description || "").trim())
+      .map((item) => {
+        const type = item.type === "header" || item.type === "indented" ? item.type : "item";
+        const base = {
+          description: item.description.trim(),
+          type: type,
+          groupName: item.groupName || null,
+        };
+        if (type === "header") return base;
+        const qty = Number(item.qty) || 0;
+        const rate = Number(item.rate) || 0;
+        return { ...base, qty, rate, amount: roundMoney(qty * rate) };
       });
-    });
 
     if (!lineItems.length) {
       alert("Add at least one line item");
@@ -409,28 +544,57 @@ function openChangeOrderModal(editData = null) {
   };
 }
 
-function addChangeOrderLineItem() {
-  const tbody = document.getElementById("co_line_items_body");
-  if (!tbody) return;
-  const typeSel = document.getElementById("co_add_line_type");
-  const type = typeSel ? typeSel.value : "item";
-  const wrapper = document.createElement("tbody");
-  wrapper.innerHTML = coLineItemRowHtml({ type });
-  tbody.appendChild(wrapper.firstElementChild);
+function coToggleAddMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById("co_add_menu");
+  if (!menu) return;
+  const opening = menu.style.display === "none";
+  menu.style.display = opening ? "block" : "none";
+  if (opening) {
+    // Close on any click elsewhere -- registered fresh each time the
+    // menu opens, and removes itself the moment it fires, so it never
+    // piles up duplicate listeners across repeated opens.
+    const closeOnOutsideClick = function (e) {
+      if (!menu.contains(e.target)) {
+        menu.style.display = "none";
+        document.removeEventListener("click", closeOnOutsideClick);
+      }
+    };
+    setTimeout(() => document.addEventListener("click", closeOnOutsideClick), 0);
+  }
+}
+window.coToggleAddMenu = coToggleAddMenu;
+
+function coAddMenuAction(action) {
+  const menu = document.getElementById("co_add_menu");
+  if (menu) menu.style.display = "none";
+  if (action === "group") {
+    coAddBlankGroup();
+    return;
+  }
+  addChangeOrderLineItem(action);
+}
+window.coAddMenuAction = coAddMenuAction;
+
+function addChangeOrderLineItem(type) {
+  type = type === "header" || type === "indented" ? type : "item";
+  const insertAt = coGetInsertPosition();
+  const inheritedGroup = insertAt > 0 ? currentChangeOrderLineItems[insertAt - 1].groupName || null : null;
+  const newItem = type === "header"
+    ? { groupName: inheritedGroup, description: "", type: "header" }
+    : { groupName: inheritedGroup, description: "", qty: 1, rate: 0, type: type };
+  currentChangeOrderLineItems.splice(insertAt, 0, newItem);
+  coLastFocusedIndex = insertAt;
+  renderCoLineItemsTable();
 }
 
 function recalcChangeOrderTotals() {
-  const rows = document.querySelectorAll("#co_line_items_body tr");
-  let subtotal = 0;
-  rows.forEach((row) => {
-    if (row.dataset.lineType === "header") return;
-    const qty = Number(row.querySelector(".co-line-qty").value) || 0;
-    const rate = Number(row.querySelector(".co-line-rate").value) || 0;
-    const amt = roundMoney(qty * rate);
-    row.querySelector(".co-line-amt").value = amt;
-    subtotal += amt;
-  });
-  subtotal = roundMoney(subtotal);
+  const subtotal = roundMoney(
+    currentChangeOrderLineItems.reduce(
+      (s, item) => s + (Number(item.qty) || 0) * (Number(item.rate) || 0),
+      0,
+    ),
+  );
   const vat = calculateTax(subtotal, "VAT");
   const total = roundMoney(subtotal + vat);
 
@@ -455,22 +619,43 @@ async function renderChangeOrderReport(
 
   const lineItems = coParseLineItems(changeOrder.lineItems);
 
-  const itemRows = lineItems
-    .map((item) => {
-      if (item.type === "header") {
-        return `<tr>
+  function coRowHtml(item) {
+    if (item.type === "header") {
+      return `<tr>
           <td colspan="4" style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; font-weight:800;">${escapeHtml(item.description || "")}</td>
         </tr>`;
-      }
-      const descPadding = item.type === "indented" ? "padding:8px 8px 8px 24px;" : "padding:8px;";
-      return `<tr>
+    }
+    const descPadding = item.type === "indented" ? "padding:8px 8px 8px 24px;" : "padding:8px;";
+    return `<tr>
           <td style="border-bottom:1px solid #adb5bd; ${descPadding} font-size:12px;">${escapeHtml(item.description || "")}</td>
           <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;">${escapeHtml(item.qty != null ? item.qty : "")}</td>
           <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right;">₦${moneyValue(item.rate)}</td>
           <td style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; text-align:right; font-weight:700;">₦${moneyValue(item.amount)}</td>
         </tr>`;
-    })
-    .join("");
+  }
+
+  let itemRows = "";
+  const coSeenGroups = [];
+  lineItems.forEach((item) => {
+    const g = item.groupName || "";
+    if (coSeenGroups.indexOf(g) === -1) coSeenGroups.push(g);
+  });
+  coSeenGroups.forEach((g) => {
+    if (g) {
+      itemRows += `<tr><td colspan="4" style="padding:8px 8px 4px; font-weight:800; text-decoration:underline; font-size:12.5px;">${escapeHtml(g)}</td></tr>`;
+    }
+    lineItems.filter((item) => (item.groupName || "") === g).forEach((item) => {
+      itemRows += coRowHtml(item);
+    });
+    if (g) {
+      const groupTotal = roundMoney(
+        lineItems
+          .filter((item) => (item.groupName || "") === g)
+          .reduce((s, item) => s + (Number(item.amount) || 0), 0),
+      );
+      itemRows += `<tr><td colspan="3" style="text-align:right; padding:8px; font-weight:700; font-size:12px; border-bottom:1px solid #000;">Group Subtotal</td><td style="text-align:right; padding:8px; font-weight:700; font-size:12px; border-bottom:1px solid #000;">₦${moneyValue(groupTotal)}</td></tr>`;
+    }
+  });
 
   const subtotal = Number(changeOrder.subtotal) || 0;
   const vat = Number(changeOrder.vat) || 0;
