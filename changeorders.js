@@ -730,7 +730,7 @@ async function renderChangeOrderReport(
       ${changeOrder.notes ? `<div style="margin-bottom: 16px; padding: 12px; background: #f8f9fa; border-radius: 8px; border: 1px solid #adb5bd;"><strong style="font-size: 12px; text-transform: uppercase;">Notes</strong><p style="font-size: 12px; margin-top: 4px; line-height: 1.5;">${escapeHtml(changeOrder.notes)}</p></div>` : ""}
       ${renderAttachmentsSectionHtml(await resolveSingleAttachment(changeOrder.attachments, selectedAttachmentIndex), "Attachment")}
       <div style="display:flex; gap:24px; flex-wrap:wrap; margin-top:16px;">
-        <div style="display:flex; align-items:flex-end; gap:14px;">${signatureHtml}${accountDetailsHtml}</div>
+        <div style="display:flex; align-items:flex-end; gap:50mm;">${signatureHtml}${accountDetailsHtml}</div>
         ${clientSigBlock}
       </div>
     </div>
