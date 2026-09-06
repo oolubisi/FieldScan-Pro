@@ -622,7 +622,7 @@ async function renderChangeOrderReport(
   function coRowHtml(item) {
     if (item.type === "header") {
       return `<tr>
-          <td colspan="4" style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px; font-weight:800;">${escapeHtml(item.description || "")}</td>
+          <td colspan="4" style="border-bottom:1px solid #adb5bd; padding:8px; font-size:12px;">${escapeHtml(item.description || "")}</td>
         </tr>`;
     }
     const descPadding = item.type === "indented" ? "padding:8px 8px 8px 24px;" : "padding:8px;";

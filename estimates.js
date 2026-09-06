@@ -1124,7 +1124,7 @@ async function renderEstimateReportDoc(est) {
   function rowHtml(item) {
     const type = item.type === "header" || item.type === "indented" ? item.type : "item";
     if (type === "header") {
-      return '<tr><td colspan="5" style="padding:6px; font-size:12px; font-weight:800;">' + escapeHtml(item.description || "") + '</td></tr>';
+      return '<tr><td colspan="5" style="padding:6px; font-size:12px;">' + escapeHtml(item.description || "") + '</td></tr>';
     }
     const descPadding = type === "indented" ? "padding:6px 6px 6px 24px;" : "padding:6px;";
     return (
