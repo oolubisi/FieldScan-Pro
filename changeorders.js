@@ -661,11 +661,15 @@ async function renderChangeOrderReport(
   const vat = Number(changeOrder.vat) || 0;
   const total = Number(changeOrder.total) || 0;
 
-  // Per-user signature first, falling back to the company-wide one.
-  const signName = escapeHtml(await _getSignatoryName());
-  const signImg = await _getSignImageUrl();
+  // Per-user signature first, falling back to the company-wide one --
+  // same shared function estimates.js uses, rather than the simpler
+  // inline signature HTML this report built on its own before, which
+  // didn't have the same layered name/image fallbacks.
+  const signatureHtml = await generateInspectionSignatureBlocks((await _getSignatoryName()) || "Kayode Olubisi");
   const includeClientSig =
     document.getElementById("co-rep-client-sig")?.checked;
+  const includeBankDetails =
+    document.getElementById("co-rep-bank-details")?.checked;
 
   let clientSigBlock = "";
   if (includeClientSig) {
@@ -676,6 +680,18 @@ async function renderChangeOrderReport(
       </div>
     </div>`;
   }
+
+  // Same structure and defaults as estimates.js's own account details
+  // block, just gated by a print-time checkbox here rather than a
+  // persisted per-record toggle, since change orders don't carry a
+  // showAccountDetails field of their own.
+  const accountDetailsHtml = includeBankDetails
+    ? '<div style="border:1px solid #000; padding:8px 12px; font-size:11px; line-height:1.7; margin-top:16px; max-width:220px;">' +
+      (settings.Account_Name ? '<div>' + escapeHtml(settings.Account_Name) + '</div>' : '') +
+      (settings.Bank_Name ? '<div>' + escapeHtml(settings.Bank_Name) + '</div>' : '') +
+      (settings.Account_Number ? '<div>' + escapeHtml(settings.Account_Number) + '</div>' : '') +
+      '</div>'
+    : '';
 
   return `<div class="report-page-wrapper">
     <div class="report-content">
@@ -713,12 +729,10 @@ async function renderChangeOrderReport(
       </table>
       ${changeOrder.notes ? `<div style="margin-bottom: 16px; padding: 12px; background: #f8f9fa; border-radius: 8px; border: 1px solid #adb5bd;"><strong style="font-size: 12px; text-transform: uppercase;">Notes</strong><p style="font-size: 12px; margin-top: 4px; line-height: 1.5;">${escapeHtml(changeOrder.notes)}</p></div>` : ""}
       ${renderAttachmentsSectionHtml(await resolveSingleAttachment(changeOrder.attachments, selectedAttachmentIndex), "Attachment")}
+      ${accountDetailsHtml}
       <div style="display:flex; gap:24px; flex-wrap:wrap;">
-        <div style="margin-top: 32px; page-break-inside: avoid; text-align: left; flex:1;">
-          <div style="display: inline-block; text-align: center;">
-            ${signImg ? `<div style="margin-bottom: 4px;"><img src="${escapeAttr(signImg)}" style="max-height:50px; max-width:150px; object-fit:contain;" onerror="this.style.display='none'"></div>` : ""}
-            <div style="font-size: 12px; font-weight: 700;">${signName || "_________________________"}</div>
-          </div>
+        <div style="flex:1;">
+          ${signatureHtml}
         </div>
         ${clientSigBlock}
       </div>
@@ -766,6 +780,10 @@ async function previewChangeOrderReport(changeOrderId) {
     <label style="display:flex; align-items:center; gap:8px; margin-bottom:12px; font-weight:700; cursor:pointer;">
       <input type="checkbox" id="co-rep-client-sig" style="width:auto;" onchange="window.regenerateChangeOrderPreview('${escapeAttr(changeOrderId)}')">
       Include client signature line
+    </label>
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:12px; font-weight:700; cursor:pointer;">
+      <input type="checkbox" id="co-rep-bank-details" style="width:auto;" onchange="window.regenerateChangeOrderPreview('${escapeAttr(changeOrderId)}')">
+      Include banking details
     </label>
     <div id="co-report-picker">${renderAttachmentPickerHtml(resolvedAttachments, coReportSelectedAttachmentIndex, "window.regenerateChangeOrderAttachment", `'${escapeAttr(changeOrderId)}'`)}</div>
     <div id="co-report-preview" style="max-height:60vh; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">
