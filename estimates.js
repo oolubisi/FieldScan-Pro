@@ -1211,7 +1211,7 @@ async function renderEstimateReportDoc(est) {
     '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin:0; padding:0; page-break-inside:avoid;">' +
     '<div style="display:flex; flex-direction:column; gap:10px;">' +
     '<div style="display:flex; align-items:flex-end; gap:14px;" id="est-signature-block">' + signatureHtml + accountDetailsHtml + '</div>' +
-    '<div style="width:80mm; max-width:80mm; box-sizing:content-box; overflow-wrap:break-word; word-wrap:break-word;">' + conditionsHtml + '</div>' +
+    '<div style="width:80mm; max-width:80mm; box-sizing:content-box; overflow-wrap:break-word; word-wrap:break-word; margin-left:50mm;">' + conditionsHtml + '</div>' +
     '</div>' +
     '<div style="max-width:320px; flex-shrink:0; padding-top:10px;"><div id="est-discount-block">' + discountRows.join("") + '</div><div id="est-vat-line" style="margin-top:10px;">' + totalRows.join("") + '</div></div>' +
     '</div>' +
