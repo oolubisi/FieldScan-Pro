@@ -328,7 +328,7 @@ function openChangeOrderModal(editData = null) {
     <input type="hidden" id="co_id" value="${escapeAttr(isEdit ? editData.changeOrderId : "")}">
 
     <label ${labelStyle}>Date</label>
-    <input id="co_date" type="text" value="${escapeAttr(isEdit ? editData.date : todayFormatted())}" ${largeInput}>
+    <input id="co_date" type="date" value="${escapeAttr(isEdit && editData.date ? (typeof ymd === "function" ? ymd(editData.date) : String(editData.date).slice(0, 10)) : new Date().toISOString().slice(0, 10))}" ${largeInput}>
 
     <label ${labelStyle}>Title</label>
     <input id="co_title" value="${escapeAttr(isEdit ? editData.title : "")}" placeholder="e.g. Additional Balcony Tiling" ${largeInput}>
