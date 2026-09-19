@@ -316,8 +316,8 @@ function openEstimateModal(editData) {
     '<button type="button" class="action-btn" style="width:auto; padding:12px 14px; font-size:13px; background:var(--card-light); color:var(--text);" onclick="window.openClientModal(null)">+ New</button>' +
     '</div>' +
     '<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-top:10px;">' +
-    '<div><label ' + labelStyle + '>Date</label><input id="est_date" type="date" value="' + escapeAttr(isEdit && editData.estimateDate ? editData.estimateDate : todayStr) + '" ' + largeInput + '></div>' +
-    '<div><label ' + labelStyle + '>Valid Until</label><input id="est_valid_until" type="date" value="' + escapeAttr(isEdit && editData.validUntilDate ? editData.validUntilDate : defaultValidUntil) + '" ' + largeInput + '></div>' +
+    '<div><label ' + labelStyle + '>Date</label><input id="est_date" type="date" value="' + escapeAttr(isEdit && editData.estimateDate ? (typeof ymd === "function" ? ymd(editData.estimateDate) : String(editData.estimateDate).slice(0, 10)) : todayStr) + '" ' + largeInput + '></div>' +
+    '<div><label ' + labelStyle + '>Valid Until</label><input id="est_valid_until" type="date" value="' + escapeAttr(isEdit && editData.validUntilDate ? (typeof ymd === "function" ? ymd(editData.validUntilDate) : String(editData.validUntilDate).slice(0, 10)) : defaultValidUntil) + '" ' + largeInput + '></div>' +
     '<div><label ' + labelStyle + '>Status</label><select id="est_status" ' + largeInput + '>' + statusOptions + '</select></div>' +
     '<div><label ' + labelStyle + '>Estimate Number</label><input value="' + escapeAttr(isEdit && editData.estimateNumber ? editData.estimateNumber : "Assigned once sent") + '" disabled style="' + largeInput + ' background:#f0f0f0;"></div>' +
     '</div>' +
