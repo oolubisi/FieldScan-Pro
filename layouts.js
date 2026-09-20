@@ -306,7 +306,6 @@ async function generateLayoutHeader(title, project, layout) {
       html += `<div><strong style="color:#000;">Client:</strong> ${escapeHtml(project.clientName || "—")}</div>`;
     }
     if (cfg.showProjectInfo && project) {
-      html += `<div><strong style="color:#000;">Project ID:</strong> ${escapeHtml(project.projectId || "—")}</div>`;
       html += `<div><strong style="color:#000;">Location:</strong> ${escapeHtml(project.siteLocation || "—")}</div>`;
     }
     html += `</div></div>`;
@@ -320,32 +319,12 @@ function generateLayoutFooter(layout) {
   const cfg = layout.config;
   if (!cfg.showFooter) return "";
 
-  // DEFAULT_LAYOUTS is a module-level constant, evaluated at script-load
-  // time before settings are even fetched -- it can't call
-  // _getCompanyDetails() directly (there'd be nothing to read yet). So
-  // instead: if this layout's stored value is STILL the original
-  // hardcoded placeholder (meaning nobody's ever customized it), swap
-  // in the real, current company details at render time. Anything the
-  // user has actually typed here -- including the deliberately-blank
-  // no-branding layout, which never reaches this point at all since it
-  // uses footerText instead -- is respected as-is.
-  const STALE_DEFAULT_ADDRESS = "Road 1 House 5B, Isheri-Brooks Estate, Isheri-Olofin, Ogun State";
-  let companyAddress = cfg.companyAddress;
-  let companyPhones = cfg.companyPhones;
-  let companyEmail = cfg.companyEmail;
-  if (companyAddress === STALE_DEFAULT_ADDRESS && typeof _getCompanyDetails === "function") {
-    const c = _getCompanyDetails();
-    companyAddress = c.address;
-    companyPhones = [c.phone1, c.phone2].filter(Boolean).join("    ");
-    companyEmail = c.email;
-  }
-
-  const addressLine = companyAddress
-    ? `<div>${escapeHtml(companyAddress)}</div>`
+  const addressLine = cfg.companyAddress
+    ? `<div>${escapeHtml(cfg.companyAddress)}</div>`
     : "";
   const contactLine =
-    companyPhones || companyEmail
-      ? `<div>${escapeHtml(companyPhones || "")}${companyPhones && companyEmail ? "&nbsp;&nbsp;&nbsp;" : ""}${escapeHtml(companyEmail || "")}</div>`
+    cfg.companyPhones || cfg.companyEmail
+      ? `<div>${escapeHtml(cfg.companyPhones || "")}${cfg.companyPhones && cfg.companyEmail ? "&nbsp;&nbsp;&nbsp;" : ""}${escapeHtml(cfg.companyEmail || "")}</div>`
       : "";
 
   if (cfg.footerText) {
@@ -710,7 +689,7 @@ async function buildLayoutPreview(cfg) {
         cfg.showClientInfo || cfg.showProjectInfo
           ? `<div style="margin-top:6px; font-size:8px; line-height:1.6; display:grid; grid-template-columns:1fr 1fr; gap:2px 10px;">
         ${cfg.showClientInfo ? "<div><strong>Client:</strong> John Doe</div>" : ""}
-        ${cfg.showProjectInfo ? "<div><strong>Project ID:</strong> PRJ/25/001</div><div><strong>Location:</strong> Lagos</div>" : ""}
+        ${cfg.showProjectInfo ? "<div><strong>Location:</strong> Lagos</div>" : ""}
       </div>`
           : ""
       }

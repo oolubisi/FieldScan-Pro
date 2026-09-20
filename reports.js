@@ -520,7 +520,7 @@ async function generateReportHeader(title, project, settings) {
   }
   html += `</div>`;
   if (project)
-    html += `<div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #adb5bd; font-size: 12px; line-height: 1.6;"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px 20px;"><div><strong style="color:#000;">Client:</strong> ${escapeHtml(project.clientName || "—")}</div><div><strong style="color:#000;">Project ID:</strong> ${escapeHtml(project.projectId || "—")}</div><div><strong style="color:#000;">Location:</strong> ${escapeHtml(project.siteLocation || "—")}</div><div><strong style="color:#000;">Phone:</strong> ${escapeHtml(project.clientPhone || "—")}</div></div></div>`;
+    html += `<div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #adb5bd; font-size: 12px; line-height: 1.6;"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px 20px;"><div><strong style="color:#000;">Client:</strong> ${escapeHtml(project.clientName || "—")}</div><div><strong style="color:#000;">Location:</strong> ${escapeHtml(project.siteLocation || "—")}</div><div><strong style="color:#000;">Phone:</strong> ${escapeHtml(project.clientPhone || "—")}</div></div></div>`;
   html += `</div>`;
   return html;
 }
@@ -551,7 +551,6 @@ async function generateFlowReportHeader(title, project, options = {}) {
     <div style="margin-top:14px; padding:12px 14px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; font-size:12px; line-height:1.6;">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px 20px;">
         <div><strong style="color:#000;">Client:</strong> ${escapeHtml(project.clientName || "—")}</div>
-        <div><strong style="color:#000;">Project ID:</strong> ${escapeHtml(project.projectId || "—")}</div>
         <div><strong style="color:#000;">Location:</strong> ${escapeHtml(project.siteLocation || "—")}</div>
         ${extraFields}
       </div>
@@ -2036,18 +2035,14 @@ async function renderPcrReport(project, changeOrders, payments, mode) {
             <tr>
               <td style="padding: 5px 0; font-weight: 700; width: 30%;">Client</td>
               <td style="padding: 5px 0;">${escapeHtml(project.clientName || "—")}</td>
-              <td style="padding: 5px 0; font-weight: 700; width: 30%;">Project ID</td>
-              <td style="padding: 5px 0;">${escapeHtml(project.projectId || "—")}</td>
             </tr>
             <tr>
               <td style="padding: 5px 0; font-weight: 700;">Site Location</td>
               <td style="padding: 5px 0;">${escapeHtml(project.siteLocation || "—")}</td>
-              <td style="padding: 5px 0; font-weight: 700;">Client Phone</td>
-              <td style="padding: 5px 0;">${escapeHtml(project.clientPhone || "—")}</td>
             </tr>
             <tr>
               <td style="padding: 5px 0; font-weight: 700;">Project Status</td>
-              <td style="padding: 5px 0;" colspan="3">${escapeHtml(pcrStatus)}</td>
+              <td style="padding: 5px 0;">${escapeHtml(pcrStatus)}</td>
             </tr>
           </tbody>
         </table>
