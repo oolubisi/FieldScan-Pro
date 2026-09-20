@@ -607,6 +607,7 @@ async function saveProjectPcrFields() {
     if (projectForCheck) {
       const subtotal = roundMoney(Number(projectForCheck.contractSubtotal) || 0);
       const vat = calculateTax(subtotal, "VAT");
+      const wht = calculateTax(subtotal, "WHT");
       const totalContract = roundMoney(subtotal + vat);
       let totalReceived = 0;
       if (typeof getAllPaymentGroups === "function") {
@@ -614,7 +615,13 @@ async function saveProjectPcrFields() {
           if (g.direction === "Client Receipt") totalReceived += g.paymentsToDate;
         });
       }
-      const balanceExpected = roundMoney(totalContract - roundMoney(totalReceived));
+      totalReceived = roundMoney(totalReceived);
+      // Same WHT-aware calculation as the report renderer: withheld tax is
+      // never actually paid to the contractor, so it shouldn't count
+      // toward what's still outstanding when that toggle is on.
+      const balanceExpected = (pcrShowWht ? pcrShowWht.checked : true)
+        ? roundMoney(totalContract - wht - totalReceived)
+        : roundMoney(totalContract - totalReceived);
       if (payload.pcrRequestedAmount > balanceExpected) {
         alert("Requested Amount (₦" + moneyValue(payload.pcrRequestedAmount) + ") cannot exceed the Balance Expected (₦" + moneyValue(balanceExpected) + ").");
         return false;

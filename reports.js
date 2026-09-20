@@ -558,7 +558,7 @@ async function generateFlowReportHeader(title, project, options = {}) {
   </div>`;
 }
 
-function generateSignatureBlock() {
+async function generateSignatureBlock() {
   if (typeof getLayoutForReport === "function" && currentReportType) {
     try {
       const layout = getLayoutForReport(currentReportType);
@@ -567,13 +567,7 @@ function generateSignatureBlock() {
       }
     } catch (e) {}
   }
-  return `<div style="margin-top: 32px; page-break-inside: avoid;">
-    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; color: #495057;">Authorized Signatory</div>
-    <div style="display: inline-block; text-align: center;">
-      <div style="border-bottom: 1.5px solid #000; width: 200px; margin: 0 auto 4px auto;"></div>
-      <div style="font-size: 12px; font-weight: 700;">_________________________</div>
-    </div>
-  </div>`;
+  return await generateInspectionSignatureBlocks((await _getSignatoryName()) || "Kayode Olubisi");
 }
 
 function generateReportFooter() {
@@ -796,7 +790,7 @@ async function renderFinancialAll(projects, payments, selectedFields) {
     <div class="report-content" style="padding-bottom:22mm;">
       ${await generateReportHeader("Financial Summary — All Projects", null)}
       ${table}
-      ${generateSignatureBlock()}
+      ${await generateSignatureBlock()}
     </div>
     ${generateReportFooter()}
   </div>`;
@@ -1226,20 +1220,7 @@ async function renderScopeReport(project, settings) {
   // Normalize: getSettings returns {data: {...}} or the cache may hold the raw response
   if (settings && settings.data) settings = settings.data;
   const c = _getCompanyDetails();
-  // Per-user signature first, falling back to the company-wide one.
-  const signName = escapeHtml(await _getSignatoryName());
-  const signImg = await _getSignImageUrl();
-  const hasSignature = signName || signImg;
-
-  let signatureBlock = "";
-  if (hasSignature) {
-    signatureBlock = `<div style="margin-top: 32px; page-break-inside: avoid; text-align: left;">
-      <div style="display: inline-block; text-align: center;">
-        ${signImg ? `<div style="margin-bottom: 2px;"><img src="${escapeAttr(signImg)}" style="max-height:50px; max-width:150px; object-fit:contain;" onerror="this.style.display='none'"></div>` : ""}
-        <div style="font-size: 12px; font-weight: 700;">${signName || "_________________________"}</div>
-      </div>
-    </div>`;
-  }
+  const signatureBlock = await generateInspectionSignatureBlocks((await _getSignatoryName()) || "Kayode Olubisi");
 
   return `<div class="report-page-wrapper">
     <div class="report-content" style="padding-bottom:22mm;">
@@ -1466,7 +1447,7 @@ async function renderProgressReport(project, logs) {
     )
     .join("");
   return wrapReportPage(
-    `${await generateReportHeader("Progress Report", project)}<table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px;"><thead><tr><th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase; white-space:nowrap;">Date</th><th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase; width:90px;">Trade</th><th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase; width:100px;">%</th><th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Comments</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:20px; text-align:center; color:#495057;">No progress logs recorded.</td></tr>'}</tbody></table>${generateSignatureBlock()}`,
+    `${await generateReportHeader("Progress Report", project)}<table class="report-table" style="width:100%; border-collapse: collapse; font-size:12px;"><thead><tr><th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase; white-space:nowrap;">Date</th><th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase; width:90px;">Trade</th><th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase; width:100px;">%</th><th style="background:#000; color:#fff; text-align:left; padding:8px; font-size:10px; text-transform:uppercase;">Comments</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:20px; text-align:center; color:#495057;">No progress logs recorded.</td></tr>'}</tbody></table>${await generateSignatureBlock()}`,
   );
 }
 
@@ -1864,7 +1845,13 @@ async function renderPcrReport(project, changeOrders, payments, mode) {
   totalOutgoing = roundMoney(totalOutgoing);
   smallExpenses = roundMoney(smallExpenses);
   totalPending = roundMoney(totalPending);
-  const balanceExpected = roundMoney(totalContract - totalReceived);
+  // With WHT included, the client withholds it and it's never actually
+  // paid to the contractor -- so it shouldn't count toward what's still
+  // outstanding.
+  const showWht = document.getElementById("pcr-show-wht")?.checked !== false;
+  const balanceExpected = showWht
+    ? roundMoney(totalContract - wht - totalReceived)
+    : roundMoney(totalContract - totalReceived);
   const netProfit = roundMoney(
     totalReceived - totalOutgoing - smallExpenses - totalPending,
   );
@@ -1919,13 +1906,7 @@ async function renderPcrReport(project, changeOrders, payments, mode) {
       : cache.settings || {};
   const c = _getCompanyDetails();
   const logoUrl = settings.Logo ? await resolveImageToDataUrl(settings.Logo) : "";
-  // Per-user signature first, falling back to the company-wide one.
-  const signImageUrl = await _getSignImageUrl();
   const signatoryName = await _getSignatoryName();
-
-  // ── WHT toggle ───────────────────────────────────────────────────────────
-  const showWht =
-    document.getElementById("pcr-show-wht")?.checked !== false;
 
   // ── Date ─────────────────────────────────────────────────────────────────
   const dateStr = new Date().toLocaleDateString("en-GB", {
@@ -2102,11 +2083,7 @@ async function renderPcrReport(project, changeOrders, payments, mode) {
         <!-- ══ SIGNATURE BLOCK ════════════════════════════════════════════════ -->
         <div style="margin-top: 20px; page-break-inside: avoid;">
           <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; color: #495057; letter-spacing: 0.5px; margin-bottom: 10px;">Project Sign-Off</div>
-          <div style="display: inline-block; text-align: center;">
-            ${signImageUrl ? '<div style="margin-bottom: 2px;"><img src="' + escapeAttr(signImageUrl) + '" style="max-height: 48px; max-width: 160px; object-fit: contain;" onerror="this.style.display=\'none\'"></div>' : '<div style="height: 40px;"></div>'}
-            <div style="border-bottom: 1.5px solid #000; width: 200px; margin: 0 auto 5px auto;"></div>
-            <div style="font-size: 11px; font-weight: 700;">${escapeHtml(signatoryName || "_________________________")}</div>
-          </div>
+          ${await generateInspectionSignatureBlocks(signatoryName || "Kayode Olubisi")}
         </div>
 
       </div><!-- /report-content -->

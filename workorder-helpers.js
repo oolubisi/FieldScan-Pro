@@ -180,12 +180,6 @@ async function renderWorkOrderDetailReport(workorder, project, vendors, settings
   });
   const logoUrl =
     settings && settings.Logo ? await resolveImageToDataUrl(settings.Logo) : "";
-  const signName =
-    settings && settings.Name_Signed ? escapeHtml(settings.Name_Signed) : "";
-  const signImg =
-    settings && settings.Sign_Signed
-      ? await resolveImageToDataUrl(settings.Sign_Signed)
-      : "";
 
   let headerHtml = `<div class="report-header" style="border-bottom: 2.5px solid #000; padding-bottom: 2px; margin-bottom: 18px;"><div style="display: flex; justify-content: space-between; align-items: flex-end;">`;
   headerHtml += `<div style="flex:1;"><div style="font-size: 11px; color: #495057; font-weight: 600; margin-bottom: 2px;">${escapeHtml(dateStr)}</div><div style="font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #495057; line-height: 1.1;">Work Order</div></div>`;
@@ -196,14 +190,7 @@ async function renderWorkOrderDetailReport(workorder, project, vendors, settings
   headerHtml += `<div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #adb5bd; font-size: 12px; line-height: 1.6;"><div style="display: flex; justify-content: flex-end; align-items: baseline;"><div style="font-size:16px;"><strong style="color:#000;">Work Order ID:</strong> ${escapeHtml(workorder.workOrderId || "—")}</div></div></div>`;
   headerHtml += `</div>`;
 
-  let signatureBlock = `<div style="margin-top: 32px; page-break-inside: avoid; text-align: left;">
-    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; color: #495057;">Authorized Signatory</div>
-    <div style="display: inline-block; text-align: center;">
-      ${signImg ? `<div style="margin-bottom: 4px;"><img src="${escapeAttr(signImg)}" style="max-height:50px; max-width:150px; object-fit:contain;" onerror="this.style.display='none'"></div>` : ""}
-      <div style="border-bottom: 1.5px solid #000; width: 200px; margin: 0 auto 4px auto;"></div>
-      <div style="font-size: 12px; font-weight: 700;">${signName || "_________________________"}</div>
-    </div>
-  </div>`;
+  let signatureBlock = await generateInspectionSignatureBlocks((await _getSignatoryName()) || "Kayode Olubisi");
 
   return `<div class="report-page-wrapper">
     <div class="report-content">
