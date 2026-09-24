@@ -321,8 +321,19 @@ function openChangeOrderModal(editData = null) {
   currentChangeOrderLineItems = isEdit ? coParseLineItems(editData.lineItems) : [];
   coLastFocusedIndex = -1;
 
+  // Once Approved, a change order's own details are locked -- it's a
+  // formally signed-off record and shouldn't be silently altered.
+  // Status stays interactive as the escape hatch: un-approving is the
+  // only way to unlock it again for editing.
+  const isLocked = isEdit && editData.status === "Approved";
+  const lockedWrapStyle = isLocked ? "pointer-events:none; opacity:0.55;" : "";
+
   title.innerText = isEdit ? "Edit Change Order" : "New Change Order";
   body.innerHTML = `
+    ${isLocked ? `<div style="background:#fff3cd; border:1.5px solid #ffc107; border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:13px; font-weight:700; color:#664d03;">
+      <i class="fas fa-lock"></i> This change order is Approved and locked. Change its status below to unlock it for editing.
+    </div>` : ""}
+    <div style="${lockedWrapStyle}">
     <label ${labelStyle}>Change Order Number</label>
     <input value="${escapeAttr(nextNumber)}" disabled style="${largeInput} background:#f0f0f0;">
     <input type="hidden" id="co_id" value="${escapeAttr(isEdit ? editData.changeOrderId : "")}">
@@ -332,6 +343,7 @@ function openChangeOrderModal(editData = null) {
 
     <label ${labelStyle}>Title</label>
     <input id="co_title" value="${escapeAttr(isEdit ? editData.title : "")}" placeholder="e.g. Additional Balcony Tiling" ${largeInput}>
+    </div>
 
     <label ${labelStyle}>Status</label>
     <select id="co_status" ${largeInput}>
@@ -341,6 +353,7 @@ function openChangeOrderModal(editData = null) {
       <option value="Rejected" ${isEdit && editData.status === "Rejected" ? "selected" : ""}>Rejected</option>
     </select>
 
+    <div style="${lockedWrapStyle}">
     <label ${labelStyle}>Line Items</label>
     <table style="width:100%; font-size:13px; border-collapse:collapse; margin-bottom:10px;">
       <thead>
@@ -395,6 +408,7 @@ function openChangeOrderModal(editData = null) {
     </div>
 
     ${isEdit ? `<button class="action-btn" id="co_delete_btn" style="background:var(--danger); margin-top:10px;">Delete Change Order</button>` : ""}
+    </div>
   `;
 
   renderCoLineItemsTable();
