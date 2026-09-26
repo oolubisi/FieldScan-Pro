@@ -21,10 +21,10 @@ function helpAboutSectionHtml() {
     '<h4 style="font-size:13px; margin:14px 0 6px;">Project & Financial Management</h4>' +
     '<ul style="font-size:13px; color:var(--muted); line-height:1.6; margin:0 0 4px 18px; padding:0;">' +
     '<li>Projects move through a simple lifecycle: Active → Handed Over → Abandoned.</li>' +
-    '<li>Estimates are where projects begin — itemize, group line items, and save any group to a reusable BOQ Library.</li>' +
+    '<li>Estimates are where projects begin — mix plain line items, section headers, indented sub-items, and named groups (with their own subtotal), and save any group to a reusable BOQ Library.</li>' +
     '<li>One-click invoicing: an accepted estimate becomes a project, and generating an invoice auto-attaches a formatted PDF to that project\'s Documents.</li>' +
     '<li>Accounts & Payments track every naira in and out, with CSV export for anything you need outside the app.</li>' +
-    '<li>Change Orders keep scope changes documented, approved, and reflected in the running financial picture.</li>' +
+    '<li>Change Orders keep scope changes documented and reflected in the running financial picture — once Approved, a change order\'s details lock automatically to protect the signed-off record.</li>' +
     '</ul>' +
 
     '<h4 style="font-size:13px; margin:14px 0 6px;">Field Documentation</h4>' +
@@ -38,22 +38,9 @@ function helpAboutSectionHtml() {
 
     '<h4 style="font-size:13px; margin:14px 0 6px;">Team & Vendor Management</h4>' +
     '<ul style="font-size:13px; color:var(--muted); line-height:1.6; margin:0 0 4px 18px; padding:0;">' +
-    '<li>Vendors, Clients, and Projects are never truly deleted — they\'re archived instead, fully recoverable with their history intact.</li>' +
+    '<li>Vendors and Clients are never truly deleted — they\'re archived instead, fully recoverable with their history intact.</li>' +
     '<li>Work Orders assign scoped work to vendors, tracked from Draft through Approved.</li>' +
     '<li>Bulk actions where they matter: approve multiple Work Orders, export multiple Payments at once.</li>' +
-    '</ul>' +
-
-    '<h4 style="font-size:13px; margin:14px 0 6px;">Sign In & Multiple Companies</h4>' +
-    '<ul style="font-size:13px; color:var(--muted); line-height:1.6; margin:0 0 4px 18px; padding:0;">' +
-    '<li>Sign in with your email and password — the same account works on both desktop and mobile.</li>' +
-    '<li>You can be signed into more than one company on the same device, and switch between them instantly, even with no signal, once you\'ve signed into each at least once.</li>' +
-    '<li>Signs you out automatically after 15 minutes of inactivity, with a warning first — nothing you\'re actively working on offline ever gets interrupted by this.</li>' +
-    '</ul>' +
-
-    '<h4 style="font-size:13px; margin:14px 0 6px;">Company Branding</h4>' +
-    '<ul style="font-size:13px; color:var(--muted); line-height:1.6; margin:0 0 4px 18px; padding:0;">' +
-    '<li>Settings → Company Details: your logo, name, address, phone, email, and tax/registration details, shown on every document you generate.</li>' +
-    '<li>The logo\'s size on printed documents is independently adjustable — scale it up or down without touching the original image.</li>' +
     '</ul>' +
 
     '<h4 style="font-size:13px; margin:14px 0 6px;">Tasks, Documents & Reporting</h4>' +
@@ -152,6 +139,40 @@ const HELP_SECTIONS = [
         q: "How do I invoice a project?",
         a: 'Open the project\'s Profile tab and use "Generate Invoice" — it turns the estimate the project was created from into an invoice PDF and saves it into that project\'s Documents automatically. This can only be done once per project.',
       },
+      {
+        q: "What types of line items can I add to an estimate?",
+        a: 'Click the single "+ Add" button in Line Items to choose: a plain Line Item, an Indented Line (a normal item nested visually under a heading), a Header (a description-only row with no qty or price, for breaking the list into sections), or a Group.',
+      },
+      {
+        q: "What's the difference between a Header and a Group?",
+        a: "A Header is purely visual — just a section title with nothing to total. A Group is a named set of items with its own subtotal shown after its last item, and can be saved to your BOQ Library for reuse in future estimates.",
+      },
+      {
+        q: "How do I save a group of items for reuse in future estimates?",
+        a: 'Build the group in an estimate first (using "+ Add" → Add Blank Group, then adding items under it). Then click the small cloud-upload icon next to the group\'s name — it saves that group, with its current items and prices, to your BOQ Library. Saving under a name that already exists in the Library asks whether to update it instead.',
+      },
+      {
+        q: "How do I reuse a saved group from the BOQ Library?",
+        a: 'Use "+ Add" → Add Group Block, and pick from your saved templates — this bulk-inserts the whole priced group at once, rather than adding each item by hand.',
+      },
+    ],
+  },
+  {
+    title: "Change Orders",
+    icon: "fa-file-signature",
+    items: [
+      {
+        q: "What happens when I approve a change order?",
+        a: "Its subtotal (before VAT) is added to the project's contract value, and the change order itself locks — its line items, title, and date can no longer be edited, since it's now a formally signed-off record.",
+      },
+      {
+        q: "I approved a change order by mistake — how do I fix it?",
+        a: 'Open it and change its Status back from Approved to something else (Draft, Submitted, or Rejected) — that\'s the only field that stays editable while it\'s locked. This reverses its contribution to the project\'s contract value and unlocks everything else for editing again.',
+      },
+      {
+        q: "Can I still add line items or groups to a change order?",
+        a: 'Yes — the same "+ Add" menu as Estimates: Line Item, Indented Line, Header, or Group, each with a running subtotal for the whole change order (and, for groups, their own subtotal too). This only works while the change order isn\'t Approved yet.',
+      },
     ],
   },
   {
@@ -191,7 +212,7 @@ const HELP_SECTIONS = [
     ],
   },
   {
-    title: "Client, Vendor & Project Archive",
+    title: "Client & Vendor Archive",
     icon: "fa-user-slash",
     items: [
       {
@@ -201,10 +222,6 @@ const HELP_SECTIONS = [
       {
         q: "Where did an archived client or vendor go?",
         a: 'They drop out of the main list and collapse into an "Archived" section at the bottom, closed by default. Click it to expand and find them.',
-      },
-      {
-        q: "Can I archive a project too?",
-        a: 'Yes — this is different from Project Trash (deleting). Archiving a project is purely a declutter tool: it stays fully active and editable everywhere, it just tucks into a collapsed "Archived" section on your dashboard so your active project list stays focused. Use "Archive Project" / "Unarchive Project" from the project\'s Profile tab.',
       },
     ],
   },
@@ -223,46 +240,6 @@ const HELP_SECTIONS = [
       {
         q: "Does renaming a vendor break their payment history?",
         a: 'No — payment totals and grouping stay intact regardless of a rename. Settings → "Payment ↔ Vendor Links" can link older payments to their vendor by ID (not just by name), which keeps vendor-specific reports accurate even after a rename. It only works for vendors that haven\'t already been renamed before you run it.',
-      },
-    ],
-  },
-  {
-    title: "Sign In & Switching Companies",
-    icon: "fa-right-to-bracket",
-    items: [
-      {
-        q: "How do I sign in?",
-        a: 'Tap "Sign In" in the sidebar (desktop) or the More menu (mobile), enter your email and password. Your email is remembered for next time — you\'ll only need to type your password again on this device.',
-      },
-      {
-        q: "How do I sign out?",
-        a: 'Tap the green "Signed In" indicator and confirm. Unlike switching to another company, signing out fully forgets this account on this device — you\'ll need your password again to sign back in.',
-      },
-      {
-        q: "Can I work with more than one company on the same device?",
-        a: 'Yes. Once you\'ve signed into a second company at least once, tapping "Sign In" shows a list of every company you\'ve used on this device — tap one to switch instantly, no password needed, even with no signal at all. A company you\'ve never used on this device still needs a real sign-in the first time.',
-      },
-      {
-        q: "If I switch companies, does anything from the first one carry over?",
-        a: 'No — switching always clears what\'s currently displayed on screen before loading the other company\'s data, so nothing from one company is ever visible while you\'re working in another. Anything you created offline and haven\'t synced yet stays safely queued under its own company and picks up again the moment you switch back to it.',
-      },
-      {
-        q: "Why did I get signed out automatically?",
-        a: "After 15 minutes with no activity, you'll see a warning with a chance to stay signed in before it happens. This only protects against an unattended, forgotten-open device — it never interrupts something you're actively doing, online or off.",
-      },
-    ],
-  },
-  {
-    title: "Company Branding & Documents",
-    icon: "fa-building",
-    items: [
-      {
-        q: "Where do I set up my company's logo and details?",
-        a: 'Settings → "Edit Company Details" — logo, company name, slogan, address, phone numbers, email, TIN, VAT registration number, and company registration number. Anything left blank shows as a placeholder label on documents until you fill it in, rather than showing someone else\'s details.',
-      },
-      {
-        q: "My logo looks too big or too small on printed documents — can I fix that without re-uploading it?",
-        a: 'Yes — the "Size ×" field right next to the logo upload in Company Details scales it up or down (in 0.1 steps) across every document that shows your logo, without needing a different image file.',
       },
     ],
   },
