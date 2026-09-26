@@ -1,4 +1,22 @@
 // ===== payment-helpers.js =====
+
+/**
+ * A Client Receipt's expected total is the project's own Net Receivable
+ * (Total Contract Value minus WHT), never a figure typed in by hand.
+ * Returns null if the project can't be found, so callers can fall back
+ * to whatever they already had.
+ */
+function getProjectNetReceivable(projectId) {
+  const cache = typeof getCache === "function" ? getCache() : {};
+  const project = (cache.projects || []).find((p) => p.projectId === projectId);
+  if (!project) return null;
+  const subtotal = roundMoney(Number(project.contractSubtotal) || 0);
+  const vat = calculateTax(subtotal, "VAT");
+  const wht = calculateTax(subtotal, "WHT");
+  const totalContract = roundMoney(subtotal + vat);
+  return roundMoney(totalContract - wht);
+}
+
 function onPaymentDirectionChange() {
   const dir = document.getElementById("pay_dir").value;
   const isSmall = dir === "Small Expense";
@@ -29,17 +47,9 @@ function onPaymentDirectionChange() {
     // real about the project's contract.
     const totalInput = document.getElementById("pay_total_invoice");
     if (totalInput) {
-      const cache = typeof getCache === "function" ? getCache() : {};
       const projectId = typeof getCurrentProjectId === "function" ? getCurrentProjectId() : null;
-      const project = (cache.projects || []).find((p) => p.projectId === projectId);
-      if (project) {
-        const subtotal = roundMoney(Number(project.contractSubtotal) || 0);
-        const vat = calculateTax(subtotal, "VAT");
-        const wht = calculateTax(subtotal, "WHT");
-        const totalContract = roundMoney(subtotal + vat);
-        const netReceivable = roundMoney(totalContract - wht);
-        totalInput.value = netReceivable;
-      }
+      const netReceivable = getProjectNetReceivable(projectId);
+      if (netReceivable !== null) totalInput.value = netReceivable;
       totalInput.disabled = true;
       totalInput.style.background = "#f0f0f0";
     }
@@ -134,12 +144,21 @@ function getPaymentGroupData(groupId, excludePaymentId) {
   const groupPayments = payments.filter(
     (p) => p.paymentGroupId === groupId && p.paymentId !== excludePaymentId,
   );
-  const totalInvoice =
+  let totalInvoice =
     groupPayments.length > 0
       ? Number(groupPayments[0].totalInvoice) ||
         Number(groupPayments[0].amount) ||
         0
       : 0;
+  // A Client Receipt's expected total tracks the project's contract
+  // value live -- if a change order raised or lowered it after this
+  // group's payments were already fully collected, the group should
+  // reopen (a new balance appears, and Add Stage becomes available
+  // again) rather than staying stuck at the old, now-stale figure.
+  if (groupPayments.length > 0 && isClientReceipt(groupPayments[0])) {
+    const netReceivable = getProjectNetReceivable(groupPayments[0].projectId);
+    if (netReceivable !== null) totalInvoice = netReceivable;
+  }
   const paymentsToDate = groupPayments.reduce(
     (sum, p) => roundMoney(sum + Number(p.amount || 0)),
     0,
@@ -184,6 +203,14 @@ function getAllPaymentGroups(projectId) {
       (sum, s) => roundMoney(sum + Number(s.amount || 0)),
       0,
     );
+    // Same live-recalculation as getPaymentGroupData: a Client Receipt
+    // group's expected total tracks the project's current contract
+    // value, not whatever it was worth when this group's payments
+    // started.
+    if (g.direction === "Client Receipt") {
+      const netReceivable = getProjectNetReceivable(g.projectId);
+      if (netReceivable !== null) g.totalInvoice = netReceivable;
+    }
     g.balance = roundMoney(g.totalInvoice - g.paymentsToDate);
   });
   return Object.values(groups).sort((a, b) => {

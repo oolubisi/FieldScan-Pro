@@ -552,7 +552,7 @@ async function openModal(type, editData = null) {
       if (editData.attachments)
         currentModalFiles = splitAttachments(editData.attachments);
     }
-    body.innerHTML = `<div class="passport-frame-container"><img id="passport_frame_view" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M12%2012c2.21%200%204-1.79%204-4s-1.79-4-4-4-4%201.79-4%204%201.79%204%204%204zm0%202c-2.67%200-8%201.34-8%204v2h16v-2c0-2.66-5.33-4-8-4z%22%2F%3E%3C%2Fsvg%3E" style="width:100%; height:100%; object-fit:cover;"><label style="position:absolute; bottom:0; right:0; background:#000; color:white; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><i class="fas fa-camera"></i><input type="file" id="v_pass" accept="image/*" style="display:none"></label><div id="v_pass_remove" onclick="window.clearVendorAvatarPhoto()" style="position:absolute; top:0; right:0; background:red; color:white; border-radius:50%; width:22px; text-align:center; cursor:pointer;">&times;</div></div><label ${labelStyle}>Company</label><input id="v_comp" value="${escapeAttr(isEdit ? editData.company : "")}" ${largeInput}><label ${labelStyle}>Trade</label><input id="v_trade" value="${escapeAttr(isEdit ? editData.trade : "")}" ${largeInput}><label ${labelStyle}>Contact Person</label><input id="v_contact" value="${escapeAttr(isEdit ? editData.contactName : "")}" ${largeInput}><label ${labelStyle}>Phone 1 (11 digits)</label><input id="v_phone1" type="tel" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${escapeAttr(isEdit ? editData.phone1 : "")}" ${largeInput}><label ${labelStyle}>Phone 2</label><input id="v_phone2" type="tel" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${escapeAttr(isEdit ? editData.phone2 : "")}" ${largeInput}><label ${labelStyle}>Email</label><input id="v_email" type="email" value="${escapeAttr(isEdit ? editData.email : "")}" ${largeInput}><label ${labelStyle}>Notes</label><textarea id="v_notes" rows="3" ${largeInput}>${escapeHtml(isEdit ? editData.notes || "" : "")}</textarea><div id="vendorAttachmentsPreviews" class="modal-preview-grid" style="display:none;"></div></div><label class="icon-upload-label"><i class="fas fa-paperclip"></i><input type="file" id="v_files" accept="image/*,application/pdf" multiple style="display:none"></label>${isEdit ? `<button class="action-btn" id="v_delete_btn" style="background:${(String(editData.archived).toLowerCase() === "yes" || editData.archived === true) ? "var(--success)" : "var(--danger)"}; margin-top:10px;">${(String(editData.archived).toLowerCase() === "yes" || editData.archived === true) ? "Unarchive" : "Archive"}</button>` : ""}${isEdit && (String(editData.archived).toLowerCase() === "yes" || editData.archived === true) ? `<button class="action-btn" id="v_hard_delete_btn" style="background:var(--danger); margin-top:10px;"><i class="fas fa-trash"></i> Delete Permanently</button>` : ""}`;
+    body.innerHTML = `<div class="passport-frame-container"><img id="passport_frame_view" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M12%2012c2.21%200%204-1.79%204-4s-1.79-4-4-4-4%201.79-4%204%201.79%204%204%204zm0%202c-2.67%200-8%201.34-8%204v2h16v-2c0-2.66-5.33-4-8-4z%22%2F%3E%3C%2Fsvg%3E" style="width:100%; height:100%; object-fit:cover;"><label style="position:absolute; bottom:0; right:0; background:#000; color:white; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><i class="fas fa-camera"></i><input type="file" id="v_pass" accept="image/*" style="display:none"></label><div id="v_pass_remove" onclick="window.clearVendorAvatarPhoto()" style="position:absolute; top:0; right:0; background:red; color:white; border-radius:50%; width:22px; text-align:center; cursor:pointer;">&times;</div></div><label ${labelStyle}>Company</label><input id="v_comp" value="${escapeAttr(isEdit ? editData.company : "")}" ${largeInput}><label ${labelStyle}>Trade</label><input id="v_trade" value="${escapeAttr(isEdit ? editData.trade : "")}" ${largeInput}><label ${labelStyle}>Contact Person</label><input id="v_contact" value="${escapeAttr(isEdit ? editData.contactName : "")}" ${largeInput}><label ${labelStyle}>Phone 1 (11 digits)</label><input id="v_phone1" type="tel" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${escapeAttr(isEdit ? editData.phone1 : "")}" ${largeInput}><label ${labelStyle}>Phone 2</label><input id="v_phone2" type="tel" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${escapeAttr(isEdit ? editData.phone2 : "")}" ${largeInput}><label ${labelStyle}>Email</label><input id="v_email" type="email" value="${escapeAttr(isEdit ? editData.email : "")}" ${largeInput}><label ${labelStyle}>Notes</label><textarea id="v_notes" rows="3" ${largeInput}>${escapeHtml(isEdit ? editData.notes || "" : "")}</textarea><div id="vendorAttachmentsPreviews" class="modal-preview-grid" style="display:none;"></div></div><label class="icon-upload-label"><i class="fas fa-paperclip"></i><input type="file" id="v_files" accept="image/*,application/pdf" multiple style="display:none"></label>${isEdit ? `<button class="action-btn" id="v_delete_btn" style="background:${(String(editData.archived).toLowerCase() === "yes" || editData.archived === true) ? "var(--success)" : "var(--danger)"}; margin-top:10px;">${(String(editData.archived).toLowerCase() === "yes" || editData.archived === true) ? "Unarchive" : "Archive"}</button>` : ""}`;
     if (currentAvatarPhoto && !currentAvatarPhoto.startsWith("data:")) {
       resolveImageToDataUrl(currentAvatarPhoto).then((resolved) => {
         if (!resolved) return;
@@ -608,25 +608,6 @@ async function openModal(type, editData = null) {
             btn.innerHTML = isCurrentlyArchived ? "Unarchive" : "Archive";
           });
       };
-      const hardDeleteBtn = document.getElementById("v_hard_delete_btn");
-      if (hardDeleteBtn) {
-        hardDeleteBtn.onclick = () => {
-          if (!confirm("Permanently delete this vendor? This can't be undone. This will fail if the vendor has any payment history.")) return;
-          hardDeleteBtn.disabled = true;
-          hardDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-          callApi("deleteVendor", { vendorId: uniqueId })
-            .then(() => {
-              closeModal();
-              refreshVendorsListView();
-              if (typeof showSyncToast === "function") showSyncToast("🗑️ Vendor deleted");
-            })
-            .catch((err) => {
-              alert("Could not delete vendor: " + (err && err.message ? err.message : "Unknown error"));
-              hardDeleteBtn.disabled = false;
-              hardDeleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Permanently';
-            });
-        };
-      }
     }
     submit.onclick = () => {
       const p1 = document.getElementById("v_phone1").value.trim();
@@ -978,15 +959,13 @@ ${legacyOption}
 ${vendors.map((v) => `<option value="${escapeAttr(v.company)}" ${currentPayee === v.company ? "selected" : ""}>${escapeHtml(v.company)}</option>`).join("")}
 </select>`;
       } else if (direction === "Client Receipt") {
-        const matchesCurrentProject = projects.some((p) => p.clientName === currentPayee);
-        const legacyOption = currentPayee && !matchesCurrentProject
-          ? `<option value="${escapeAttr(currentPayee)}" selected>${escapeHtml(currentPayee)} (renamed)</option>`
-          : "";
-        return `<select id="pay_payee" ${largeInput} onchange="window.recalcPaymentBalance()">
-<option value="">-- Select Project --</option>
-${legacyOption}
-${projects.map((p) => `<option value="${escapeAttr(p.clientName)}" data-project-id="${escapeAttr(p.projectId)}" ${currentPayee === p.clientName ? "selected" : ""}>${escapeHtml(p.clientName)} (${escapeHtml(p.displayNumber || p.projectId)})</option>`).join("")}
-</select>`;
+        // A Client Receipt is always against the project this payment
+        // is being logged under -- locked to it rather than left
+        // selectable, since picking a different project here would
+        // silently misattribute the payment.
+        const currentProject = projects.find((p) => p.projectId === getCurrentProjectId());
+        const lockedName = currentProject ? currentProject.clientName : currentPayee;
+        return `<input id="pay_payee" value="${escapeAttr(lockedName || "")}" disabled style="${largeInput} background:#f0f0f0;">`;
       } else
         return `<input id="pay_payee" value="${escapeAttr(currentPayee)}" placeholder="Describe the expense" ${largeInput} onchange="window.recalcPaymentBalance()">`;
     }
