@@ -290,8 +290,6 @@ async function regenerateWorkOrderReportPreview(workOrderId, index) {
 }
 window.regenerateWorkOrderReportPreview = regenerateWorkOrderReportPreview;
 
-let paymentSelectedIds = new Set();
-
 async function loadPaymentsListings(forceRefresh = false) {
   const container = document.getElementById("console-payments-list");
   let cache = getCache();
@@ -357,7 +355,7 @@ async function loadPaymentsListings(forceRefresh = false) {
           const key = `payment:${s.paymentId}`;
           window.modalRecordCache = window.modalRecordCache || {};
           window.modalRecordCache[key] = s;
-          return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--card-light); ${idx === g.stages.length - 1 ? "border-bottom:none;" : ""}"><div style="display:flex; align-items:center; gap:8px;"><input type="checkbox" style="width:auto; margin:0;" ${paymentSelectedIds.has(s.paymentId) ? "checked" : ""} onclick="event.stopPropagation(); window.paymentToggleSelect('${escapeAttr(s.paymentId)}')"><div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="event.stopPropagation(); window.openModalWithRecord('payment', window.modalRecordCache['${key}'])"><span style="font-size:11px; font-weight:900; background:var(--primary); color:#fff; padding:2px 8px; border-radius:4px; text-transform:uppercase;">${s.stage ? "Stage " + escapeHtml(s.stage) : "Full"}</span><span style="font-size:13px; color:var(--muted);">${escapeHtml(typeof ymd === "function" ? ymd(s.paymentDate) : String(s.paymentDate || "").slice(0, 10))}</span></div></div><span style="font-size:14px; font-weight:900; color:${incoming ? "var(--success)" : "var(--danger)"}; cursor:pointer;" onclick="event.stopPropagation(); window.openModalWithRecord('payment', window.modalRecordCache['${key}'])">${incoming ? "+" : "-"}₦${moneyValue(s.amount)}</span></div>`;
+          return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--card-light); ${idx === g.stages.length - 1 ? "border-bottom:none;" : ""}"><div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="event.stopPropagation(); window.openModalWithRecord('payment', window.modalRecordCache['${key}'])"><span style="font-size:11px; font-weight:900; background:var(--primary); color:#fff; padding:2px 8px; border-radius:4px; text-transform:uppercase;">${s.stage ? "Stage " + escapeHtml(s.stage) : "Full"}</span><span style="font-size:13px; color:var(--muted);">${escapeHtml(typeof ymd === "function" ? ymd(s.paymentDate) : String(s.paymentDate || "").slice(0, 10))}</span></div><span style="font-size:14px; font-weight:900; color:${incoming ? "var(--success)" : "var(--danger)"}; cursor:pointer;" onclick="event.stopPropagation(); window.openModalWithRecord('payment', window.modalRecordCache['${key}'])">${incoming ? "+" : "-"}₦${moneyValue(s.amount)}</span></div>`;
         })
         .join("");
       const statusText =
@@ -373,26 +371,8 @@ async function loadPaymentsListings(forceRefresh = false) {
     })
     .join("");
   container.innerHTML =
-    paymentSelectionBarHtml() + totalsHtml + `<div class="console-payments-grid">` + paymentsHtml + `</div>`;
+    totalsHtml + `<div class="console-payments-grid">` + paymentsHtml + `</div>`;
 }
-
-function paymentSelectionBarHtml() {
-  if (!paymentSelectedIds.size) return "";
-  return `<div class="card" style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; background:var(--card-light);">
-    <strong style="font-size:13px;">${paymentSelectedIds.size} selected</strong>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-      <button class="action-btn" style="width:auto; padding:6px 12px; font-size:12px;" onclick="window.paymentExportSelectedCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
-      <button class="action-btn" style="width:auto; padding:6px 12px; font-size:12px; background:transparent; color:var(--danger);" onclick="window.paymentClearSelection()"><i class="fas fa-xmark"></i> Clear</button>
-    </div>
-  </div>`;
-}
-
-function paymentToggleSelect(paymentId) {
-  if (paymentSelectedIds.has(paymentId)) paymentSelectedIds.delete(paymentId);
-  else paymentSelectedIds.add(paymentId);
-  loadPaymentsListings(false);
-}
-window.paymentToggleSelect = paymentToggleSelect;
 
 function deletePaymentWithUndo(payment) {
   closeModal(); // harmless no-op if no modal is open
@@ -443,33 +423,25 @@ function deletePaymentGroupWithUndo(paymentGroupId, payeeLabel) {
 }
 window.deletePaymentGroupWithUndo = deletePaymentGroupWithUndo;
 
-function paymentClearSelection() {
-  paymentSelectedIds = new Set();
-  loadPaymentsListings(false);
-}
-window.paymentClearSelection = paymentClearSelection;
-
-function paymentExportSelectedCSV() {
-  if (!paymentSelectedIds.size) return;
+function paymentExportAllCSV() {
   const cache = getCache();
   const projectId = getCurrentProjectId();
   const project = (cache.projects || []).find((p) => p.projectId === projectId);
   const groups = getAllPaymentGroups(projectId);
   const rows = [];
-  Array.from(paymentSelectedIds).forEach((paymentId) => {
-    const record = window.modalRecordCache ? window.modalRecordCache["payment:" + paymentId] : null;
-    if (!record) return;
-    const group = groups.find((g) => g.stages.some((s) => s.paymentId === paymentId));
-    rows.push({
-      date: typeof ymd === "function" ? ymd(record.paymentDate) : String(record.paymentDate || "").slice(0, 10),
-      payee: group ? group.payee || "" : "",
-      direction: group ? group.direction || "" : "",
-      stage: record.stage ? "Stage " + record.stage : "Full",
-      amount: record.amount || 0,
+  groups.forEach((group) => {
+    group.stages.forEach((record) => {
+      rows.push({
+        date: typeof ymd === "function" ? ymd(record.paymentDate) : String(record.paymentDate || "").slice(0, 10),
+        payee: group.payee || "",
+        direction: group.direction || "",
+        stage: record.stage ? "Stage " + record.stage : "Full",
+        amount: record.amount || 0,
+      });
     });
   });
   if (!rows.length) {
-    alert("Could not find data for the selected payments — try reselecting them.");
+    alert("No payments recorded for this project yet.");
     return;
   }
   const header = ["Date", "Payee", "Direction", "Stage", "Amount"];
@@ -489,7 +461,7 @@ function paymentExportSelectedCSV() {
   a.remove();
   URL.revokeObjectURL(url);
 }
-window.paymentExportSelectedCSV = paymentExportSelectedCSV;
+window.paymentExportAllCSV = paymentExportAllCSV;
 
 function csvEscape(value) {
   const str = String(value == null ? "" : value);
