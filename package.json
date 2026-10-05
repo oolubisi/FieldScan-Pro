@@ -1,39 +1,14 @@
 {
-  "name": "fieldscan-pro",
-  "version": "1.0.0",
-  "description": "Construction field management app for projects, inspections, take-offs, and financial tracking.",
-  "main": "main.js",
+  "name": "fieldscanpro-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FieldScan Pro field companion (PWA): Calculators, and the sync groundwork for Take-Off, Tasks and Inspections. No build step: the files here are served as they are.",
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux"
+    "test": "node tests/protocol.test.js && node tests/sync.test.js && node tests/probe.test.js && node tests/app.test.js && node tests/calculators.test.js && node tests/sw.test.js && node tests/pwa-files.test.js",
+    "stamp": "node tools/stamp.js"
   },
   "devDependencies": {
-    "electron": "^43.0.0",
-    "electron-builder": "^26.15.3"
-  },
-  "build": {
-    "appId": "com.fieldscan.pro",
-    "productName": "FieldScan Pro",
-    "files": [
-      "**/*",
-      "!node_modules/electron-builder/**",
-      "!.git/**"
-    ],
-    "mac": {
-      "icon": "icon-512.png",
-      "category": "public.app-category.productivity"
-    },
-    "win": {
-      "icon": "icon-512.png",
-      "target": "nsis"
-    },
-    "linux": {
-      "icon": "icon-512.png",
-      "target": "AppImage",
-      "category": "Office"
-    }
+    "fake-indexeddb": "^6.0.0",
+    "jsdom": "^30.1.1"
   }
 }

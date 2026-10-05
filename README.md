@@ -1,86 +1,85 @@
-# FieldScan Pro — complete migration package
+# FieldScan Pro: Field Companion (Phase 1)
 
-Everything from all three upload batches, reconciled against the real
-backend, plus the fixes that reconciliation turned up. This folder should
-be close to drop-in complete for your Electron app root.
+A phone app that works on its own, with no signal, and swaps small files with the desktop app through a Google Drive folder. It never signs in to Google: it only saves and reads ordinary files.
 
-## Files I modified this session (batch 3 — image serving + export)
+**In this phase:** the Calculators (the same code as the desktop), the sync plumbing, and two diagnostic screens that prove the whole path works on *your* phone before real records depend on it. Take-Off, Tasks and Inspections come in the next phases.
 
-- **utils.js** — `resolveImageToDataUrl()` rewritten. Photos now live in
-  Supabase Storage (private bucket), not Google Drive, so the old
-  `GAS_URL?id=...&token=...` doGet-proxy pattern is gone. Removed
-  `getDirectImageUrl()` entirely (nothing else used it except the now-excluded
-  variations.js). A bare `data:` URI (Settings' Logo/Sign_Signed) still
-  short-circuits with zero network calls, same as before.
-- **photos.js** — every `driveFileId` reference renamed to `storagePath`
-  (field rename to match the new backend); `phFetchRemoteImage()` now calls
-  the new `getPhotoDataUrl` backend action instead of a raw GET to a GAS URL.
-- **modals.js, reports.js, projectexport.js** — same `driveFileId` →
-  `storagePath` rename, same reason.
+## How it fits together
 
-## Files I modified in earlier sessions (batches 1–2)
+```
+Phone app --saves--> phone Downloads --folder-sync app--> Google Drive folder
+                                                               |  (Google Drive for desktop)
+Desktop app <------------------ reads/writes ------------- the same folder on your Mac
+```
 
-- index.html, config.js, db.js, api.js, main.js — see earlier conversation
-  for details (Google Sign-In wiring, Content-Type/Auth headers, mutationId
-  plumbing for offline sync).
+The desktop writes the **project list** and its replies into the same folder; the phone's sync app brings them down, and you pick them in the app (Sync tab, Choose files to import).
 
-## Files copied in unmodified (yours, for a complete folder)
+Delivery is *confirmed*, never assumed: the desktop's files carry receipts. A record stays "Sent, waiting for desktop" until a receipt arrives, and goes out again with every export until then. A file that never uploads can't silently lose data.
 
-Everything else — app.js, sw.js, backup.js, branding.js, and the ~25
-feature-module files, icons, package.json, etc. I never touched these;
-included so nothing's missing from the folder.
+---
 
-## ⚠️ variations.js — deliberately EXCLUDED
+## 1. Put the app online (GitHub Pages)
 
-You confirmed Change Orders (changeorders.js) is the surviving feature and
-Variations was being replaced by it. variations.js calls
-getVariations/saveVariation/updateVariation/deleteVariation — none of
-which exist on the backend, and I did not build them. If you still have a
-variations.js file in your real project, remove it (or leave it disconnected)
-rather than including it here.
+A phone app has to be served from a secure web address.
 
-## ⚠️ Still needs your action
+1. On GitHub, create a new repository (for example `fieldscan-mobile`).
+2. Upload the **contents** of this folder (index.html, sw.js, manifest.webmanifest, and the css, js, icons folders). Upload the files inside the folder, not the folder itself.
+3. In the repository: **Settings -> Pages -> Build and deployment**: Source "Deploy from a branch", branch `main`, folder `/ (root)`. Save.
+4. After a minute or two the address appears: `https://<your-name>.github.io/fieldscan-mobile/`.
 
-1. **main.js line ~61**: replace the `GOOGLE_CLIENT_ID` placeholder.
-2. **preload-additions.js**: merge into your real preload.js (never
-   uploaded to me, so I can't edit it directly).
-3. **vendor/ folder**: you mentioned you have this but haven't uploaded it
-   (fonts, fontawesome, html2canvas, jspdf, pdf-lib, jszip) — add it back
-   in yourself; nothing in it needed changes.
-4. **backend/api/.env**: copy from `.env.example`, fill in DATABASE_URL,
-   GOOGLE_CLIENT_ID (same value as main.js's), SUPABASE_URL,
-   SUPABASE_SERVICE_ROLE_KEY.
+## 2. Install it on the phone
 
-## What the reconciliation pass found and fixed (backend side)
+1. Open that address in **Chrome on the phone**, while you have signal.
+2. Chrome menu (three dots) -> **Install app** (or **Add to Home screen**).
+3. Open it from the new home-screen icon.
+4. Prove it works offline: switch on airplane mode, close the app, open it again. The Calculators should still work.
 
-Diffing every `callApi("...")` call across all 43 uploaded files against
-what the backend actually implements found exactly 5 missing actions:
+## 3. Set up the sync folder on the Mac
 
-- **getTakeOffTemplates / saveTakeOffTemplate / deleteTakeOffTemplate** —
-  a real gap, now built (`backend/api/src/routes/takeOffTemplates.js`,
-  `take_off_templates` table in schema.sql). Note: this table's primary
-  key is a CLIENT-generated text id (matching templates.js's own
-  `"TMPL-CUST-" + Date.now()` id generation), unlike every other table's
-  server-issued uuid — saveTakeOffTemplate is a true upsert.
-- **getVariations / deleteVariation** — NOT built, per your confirmation
-  above that Variations is legacy.
+1. Install **Google Drive for desktop** and sign in. Google Drive now appears in Finder.
+2. In My Drive, create a folder named **FieldScanPro Sync**.
+3. In the desktop app: **Sync** (sidebar) -> **Choose folder** -> pick that folder. The badge should say **Found**.
 
-Also found and fixed, independent of that diff:
+## 4. Set up a folder-sync app on the phone
 
-- **getProjectFullExportData** used to return raw snake_case DB columns
-  under lowercase table names (`exportData.photos[0].storage_path`).
-  projectexport.js reads `exportData.Photos[0].driveFileId` (PascalCase
-  keys, camelCase fields) — now fixed to match exactly, reusing each
-  table's own response-shaping function so the export gets identical
-  field names to every other endpoint.
-- **Photo image serving** — nothing previously let the frontend actually
-  *retrieve* a photo's image bytes; the old Apps Script `doGet(?id=...)`
-  proxy has no backend equivalent. Added `getPhotoDataUrl` (proxies a
-  Supabase Storage read server-side, using the service-role key, which
-  never reaches the frontend — the bucket is private).
+The phone app saves its files to the phone's **Downloads** folder. A folder-sync app (from the Play Store) moves them to Drive for you. I haven't tested any specific app, so choose one that can do all of this:
 
-## backend/ (deploy separately — not part of the Electron app bundle)
+- **Upload:** watch the **Download** folder and upload to Drive's **FieldScanPro Sync** folder, **only files whose names start with `fsp-` and end in `.json`**. (The filter matters: otherwise every download you make gets uploaded.) Ignore files ending in `.crdownload`.
+- **Download:** bring the contents of Drive's **FieldScanPro Sync** folder down to a folder on the phone, for example `FieldScanPro-inbox`.
+- Let it run automatically in the background.
 
-- schema.sql — run once against Postgres (adds `take_off_templates` since
-  the last version you have)
-- api/ — run `npm install` before `npm start`; not included in this zip
+## 5. Test the whole path (about 10 minutes)
+
+Do these in order. Each one shows exactly where a problem is if something fails.
+
+1. **Device check** (phone: Sync tab -> Device check). Run the three tests, then **Copy report**. See "What to send back" below.
+2. **Download reaches Drive.** In the Device check press **Save a test file**. Look in the phone's Downloads for a file starting `fsp-probe-`. Wait for your sync app, then look for it in Drive and in Finder.
+3. **Desktop sees it.** Desktop: Sync -> **Check for files from the phone**. You should see "Connection test file from ph-...". That proves phone to Drive to Mac works.
+4. **Project list reaches the phone.** Desktop: open a company, Sync -> **Write project list**. Wait for it to reach the phone's inbox folder. Phone: Sync -> **Choose files to import** -> pick the `fsp-projects-...` file(s). You should see your companies and project counts. Do this for each company.
+5. **Round trip.** Phone: Sync -> type a note -> **Create test note** -> **Save file for the desktop**. Wait, then desktop: **Check for files from the phone**. The note appears. Desktop: **Send test reply to phone**, then **Write project list** (it carries the receipt too). Wait, then phone: import the new files from the inbox. The note changes to **Delivered** and the desktop's reply appears.
+
+If step 5 works, the connection is proven in both directions.
+
+## 6. What to send back
+
+- The **Device check report** (it tells me what your phone and browser really support, which decides how automatic the next phases can be).
+- Which folder-sync app you used, and whether its filename filter worked.
+- Anything that didn't happen at steps 2 to 5, and which step.
+
+## Updating the app
+
+When I send updated files: upload them over the old ones in the GitHub repository (same names). Open the app once (it downloads the update in the background), then close and reopen it. A message says "App updated" when the new version takes over. The **Device check** report shows the installed build.
+
+## For developers
+
+```
+npm install        # test tools only; the app itself has no dependencies and no build step
+npm test           # all test suites
+npm run stamp      # REQUIRED after changing any app file (see below)
+```
+
+`sw.js` carries a hash of every file it caches (`BUILD`). A release is cached as one complete set under that name, so phones never run a mix of old and new files. Change any file, run `npm run stamp`, or `npm test` will fail on purpose. If you add a file, add it to the `PRECACHE` list in `sw.js` first; the tests check that nothing the page uses is missing from it.
+
+## Not in Phase 1
+
+Take-Off, Tasks, Inspections and photos. The desktop screens for them. The screen for choosing between two versions of a record edited on both sides (the logic is built and tested; the screen arrives with Take-Off). Phone notes sent from the phone are only read by the desktop in this phase, not stored.
