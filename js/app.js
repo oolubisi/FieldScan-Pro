@@ -1,11 +1,13 @@
 // ===== App shell: boot, routing, and the Sync screen =====
 
-const APP_VERSION = "0.1.0 (Phase 1)";
+const APP_VERSION = "0.2.0 (Take-Off)";
 const fsp = { db: null, sync: null, storageError: null };
 window.APP_VERSION = APP_VERSION;
 window.fsp = fsp;
 
 const ROUTES = {
+  takeoff: { tab: "takeoff", render: () => renderTakeoffScreen() },
+  conflicts: { tab: "takeoff", render: () => renderConflictsScreen() },
   calculators: { tab: "calculators", render: () => renderCalculatorsSection() },
   sync: { tab: "sync", render: () => renderSyncScreen() },
   "device-check": { tab: "sync", render: () => renderProbeScreen() },
@@ -13,7 +15,7 @@ const ROUTES = {
 
 function currentRoute() {
   const m = /^#\/([a-z-]+)/.exec(location.hash);
-  return m && ROUTES[m[1]] ? m[1] : "calculators";
+  return m && ROUTES[m[1]] ? m[1] : "takeoff";
 }
 
 function navigate() {
@@ -167,7 +169,7 @@ async function renderSyncScreen() {
       <input id="pingNote" placeholder="Test note, e.g. hello from site" maxlength="200">
       <button class="btn block" id="pingCreate" style="margin-top:8px;">Create test note</button>
       <div style="margin-top:8px;">${pingRows}</div>
-      ${status.conflicts ? `<div class="result-box error"><div>${status.conflicts} record${status.conflicts === 1 ? "" : "s"} changed on both phone and desktop and need a decision. The screen for that arrives with Take-Off.</div></div>` : ""}
+      ${status.conflicts ? `<div class="result-box error"><div>${status.conflicts} record${status.conflicts === 1 ? "" : "s"} changed on both phone and desktop and need a decision. <a href="#/conflicts">Decide now</a></div></div>` : ""}
     </div>
 
     <div class="card">

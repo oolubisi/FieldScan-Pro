@@ -92,3 +92,11 @@ Take-Off, Tasks, Inspections and photos. The desktop screens for them. The scree
 4. Tap **Sync now**. It reads new files from the desktop, sends anything the desktop hasn't confirmed, and removes this phone's own files once the desktop has confirmed them.
 
 If Chrome asks for permission after the app was closed, tap Allow. The manual import/export cards remain as a fallback.
+
+## Take-Off (first on-site feature)
+
+- **Take-Off tab** (opens first): groups belong to a project; each group holds take-offs (a sector, date, notes and line items with quantity and unit; headings are supported).
+- Everything saves on the phone first and works with no signal. **Sync now** (Sync tab) sends it to the desktop and brings back the desktop's edits.
+- Records sent to the desktop show *Not sent* → *Sent* → *Delivered ✓*. *Delivered* appears only when the desktop's receipt arrives.
+- **Decisions**: if the same record is edited on both the phone and the desktop before they sync, nothing is overwritten. A banner appears; open it to see both versions side by side and keep one. The choice goes to the other side on the next sync.
+- Fields the desktop adds to a record that the phone doesn't show are kept when the phone edits it.

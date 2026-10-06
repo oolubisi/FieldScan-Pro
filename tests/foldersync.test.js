@@ -136,6 +136,25 @@ const bundleFiles = (folder, dev) => [...folder.files.keys()].filter((n) => n.in
     console.log("Confirmed: delivered only on receipt; own confirmed files pruned; waiting files not duplicated");
   }
 
+  section("Receipt-only files are not thrown away early");
+  {
+    const folder = fakeFolder();
+    const a = await fresh(folder);
+    const dev = await a.sync.getDeviceId();
+    folder.put("fsp-bundle-" + DT + "-20261005-r1.json", desktopBundle([env({ id: "rec-r1" })]));
+    await a.fs.syncNow();
+    const first = bundleFiles(folder, dev);
+    check(first.length === 1, "receipts file written");
+    await a.fs.syncNow(); await a.fs.syncNow();
+    check(bundleFiles(folder, dev).join() === first.join(), "the newest receipts file stays, even though it has nothing to confirm");
+    // a newer file supersedes it
+    folder.put("fsp-bundle-" + DT + "-20261005-r2.json", desktopBundle([env({ id: "rec-r2" })]));
+    await a.fs.syncNow();
+    const now = bundleFiles(folder, dev);
+    check(now.length === 1 && now[0] !== first[0], "once a newer receipts file exists the older one is removed");
+    console.log("Confirmed: receipts are kept until superseded");
+  }
+
   section("Failures leave records waiting");
   {
     const folder = fakeFolder();

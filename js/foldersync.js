@@ -125,17 +125,30 @@
       return own;
     }
 
-    /** Removes our own files once the desktop has confirmed every record in them. */
-    async function pruneOwnFiles(handle, own) {
+    /**
+     * Removes our own files once they are no longer needed.
+     *  - a file carrying records goes once the desktop has confirmed every one of them;
+     *  - a receipts-only file carries nothing to confirm, so it can't be judged that way. A newer
+     *    file of ours holds all the same receipts and more, so older ones go only when a newer
+     *    file exists (just written, or already there). The newest one always stays.
+     */
+    async function pruneOwnFiles(handle, own, wroteName) {
       let pruned = 0;
-      for (const f of own) {
+      const sorted = own.slice().sort((a, b) => (a.name < b.name ? -1 : 1));
+      const newestName = wroteName || (sorted.length ? sorted[sorted.length - 1].name : null);
+      for (const f of sorted) {
         try {
-          let allDelivered = true;
-          for (const env of f.envelopes) {
-            const rec = await db.get("records", env.id);
-            if (!rec || !P.vvCovers(rec.deliveredVv || {}, env.vv)) { allDelivered = false; break; }
+          let removable;
+          if (!f.envelopes.length) {
+            removable = f.name !== newestName && newestName !== null;
+          } else {
+            removable = true;
+            for (const env of f.envelopes) {
+              const rec = await db.get("records", env.id);
+              if (!rec || !P.vvCovers(rec.deliveredVv || {}, env.vv)) { removable = false; break; }
+            }
           }
-          if (allDelivered) { await handle.removeEntry(f.name); pruned++; }
+          if (removable) { await handle.removeEntry(f.name); pruned++; }
         } catch (e) { /* leave anything we can't be sure about */ }
       }
       return pruned;
@@ -224,7 +237,7 @@
 
       // 4: tidy.
       try {
-        out.pruned = await pruneOwnFiles(handle, own);
+        out.pruned = await pruneOwnFiles(handle, own, wroteName);
         const live = new Set(files.map((f) => f.name));
         if (wroteName) live.add(wroteName);
         Object.keys(meta.processed).forEach((n) => { if (!live.has(n)) delete meta.processed[n]; });

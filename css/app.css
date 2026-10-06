@@ -89,3 +89,18 @@ table.checks td:last-child { text-align: right; font-weight: 700; }
 }
 #status-bar.show { opacity: 1; }
 #status-bar.error { background: #991b1b; }
+
+/* Take-Off and decisions */
+a.link-card { display: block; color: inherit; text-decoration: none; }
+.back { display: inline-block; margin-bottom: 8px; color: #2563eb; text-decoration: none; font-weight: 600; }
+.notice { display: block; background: #fef3c7; color: #92400e; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; text-decoration: none; font-weight: 600; }
+.field { display: block; font-weight: 700; font-size: 14px; margin-top: 10px; }
+.field input, .field select, .field textarea { display: block; width: 100%; margin-top: 4px; font-weight: 400; }
+.btn.small { padding: 8px 12px; min-width: 40px; }
+a.btn { display: inline-block; text-align: center; text-decoration: none; }
+.to-line { border-bottom: 1px solid #eef0f3; padding: 8px 0; display: grid; gap: 6px; }
+.to-line.header { grid-template-columns: 1fr auto; background: #eef0f3; border-radius: 8px; padding: 6px; }
+.to-line input, .to-line select { width: 100%; min-width: 0; }
+.to-qtyrow { display: grid; grid-template-columns: 1fr 1.2fr auto; gap: 6px; }
+.conflict .side { padding: 8px 0; border-bottom: 1px solid #eef0f3; }
+.conflict .side-title { font-weight: 800; }

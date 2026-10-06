@@ -4,7 +4,7 @@
   "private": true,
   "description": "FieldScan Pro field companion (PWA): Calculators, and the sync groundwork for Take-Off, Tasks and Inspections. No build step: the files here are served as they are.",
   "scripts": {
-    "test": "node tests/protocol.test.js && node tests/sync.test.js && node tests/foldersync.test.js && node tests/probe.test.js && node tests/app.test.js && node tests/calculators.test.js && node tests/sw.test.js && node tests/pwa-files.test.js",
+    "test": "node tests/protocol.test.js && node tests/sync.test.js && node tests/foldersync.test.js && node tests/takeoff.test.js && node tests/probe.test.js && node tests/app.test.js && node tests/calculators.test.js && node tests/sw.test.js && node tests/pwa-files.test.js",
     "stamp": "node tools/stamp.js"
   },
   "devDependencies": {
