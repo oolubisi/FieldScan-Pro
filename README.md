@@ -83,3 +83,12 @@ npm run stamp      # REQUIRED after changing any app file (see below)
 ## Not in Phase 1
 
 Take-Off, Tasks, Inspections and photos. The desktop screens for them. The screen for choosing between two versions of a record edited on both sides (the logic is built and tested; the screen arrives with Take-Off). Phone notes sent from the phone are only read by the desktop in this phase, not stored.
+
+## Sync now (Syncthing folder)
+
+1. On the phone, make one dedicated folder (e.g. `FieldScanPro Sync`) and share it with the Mac's sync folder in Syncthing. On both sides set Ignore Patterns to exactly these two lines: `!fsp-*.json` then `*`.
+2. On the Mac, in FieldScan Pro's Sync screen, choose that same Mac folder.
+3. On the phone, open Sync, tap **Choose sync folder** and pick the Android folder.
+4. Tap **Sync now**. It reads new files from the desktop, sends anything the desktop hasn't confirmed, and removes this phone's own files once the desktop has confirmed them.
+
+If Chrome asks for permission after the app was closed, tap Allow. The manual import/export cards remain as a fallback.

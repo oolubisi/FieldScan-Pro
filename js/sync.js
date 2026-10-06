@@ -143,11 +143,18 @@
      * confirmed yet, plus acknowledgements of everything this phone holds
      * (so the desktop can stop re-sending those).
      */
-    async function exportBundle() {
+    async function exportBundle(options) {
+      const opts = options || {};
+      const send = opts.deliver || deliver;
       const deviceId = await getDeviceId();
       const all = await db.getAll("records");
       if (!all.length) return { empty: true };
-      const undelivered = all.filter((r) => !P.vvCovers(r.deliveredVv || {}, r.vv));
+      // Records already waiting inside a file of ours in the shared folder need no second copy.
+      const waiting = opts.waitingInFolder || {};
+      const undelivered = all.filter((r) => !P.vvCovers(r.deliveredVv || {}, r.vv) && !(waiting[r.id] && P.vvCovers(waiting[r.id], r.vv)));
+      // Folder sync calls this every time; writing a file when there is nothing
+      // new to say would only fill the folder with identical files.
+      if (opts.onlyIfNeeded && !undelivered.length && !opts.includeAcks) return { nothingToSend: true, sent: 0, acks: 0 };
       const bundle = P.makeBundle({
         origin: deviceId,
         envelopes: undelivered.map((r) => toEnvelope(r, deviceId)),
@@ -155,7 +162,7 @@
         now: clock(),
       });
       const filename = P.bundleFilename(bundle);
-      await deliver(filename, JSON.stringify(bundle, null, 2), "application/json");
+      await send(filename, JSON.stringify(bundle, null, 2), "application/json");
       // Only mark as exported once the download has been handed to the browser.
       await db.putMany("records", undelivered.map((r) => ({ ...r, exportedVv: r.vv })));
       await log(`Saved ${filename} (${undelivered.length} record${undelivered.length === 1 ? "" : "s"}, ${all.length} acknowledgement${all.length === 1 ? "" : "s"})`);
@@ -277,6 +284,7 @@
     async function importText(name, text) {
       const parsed = P.parseFileText(text);
       if (!parsed.ok) return { file: name, ok: false, reason: parsed.errors[0] };
+      if (parsed.kind === "probe") return { file: name, ok: true, kind: "probe" }; // a connection test: nothing to import
       return parsed.kind === "bundle" ? importBundle(name, parsed.value) : importProjects(name, parsed.value);
     }
 

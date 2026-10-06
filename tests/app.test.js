@@ -303,6 +303,42 @@ const T0 = new Date("2026-10-05T10:00:00Z");
     console.log("Confirmed: download test, folder test (works / can't), remembered-folder (none / granted / needs a tap), file picking and copy -- all with honest reporting");
   }
 
+  section("Sync screen: Sync now with a chosen folder");
+  {
+    const a = await bootApp({ hash: "#/sync" });
+    await a.waitFor(() => a.text("#main h2") === "Sync", "the Sync screen");
+    // Chrome without folder access: honest fallback, no dead button
+    check(!a.$("#folderChoose") && /can't open a folder directly/.test(a.text("#main")), "no folder button when the browser can't do it");
+
+    // a fake Android folder holding one desktop file
+    const files = new Map();
+    const dir = {
+      name: "FieldScanPro Sync",
+      queryPermission: async () => "granted", requestPermission: async () => "granted",
+      entries: async function* () { for (const n of [...files.keys()]) yield [n, { kind: "file", getFile: async () => ({ name: n, size: files.get(n).length, lastModified: 1, text: async () => files.get(n) }) }]; },
+      getFileHandle: async (n) => ({ getFile: async () => ({ name: n, size: (files.get(n) || "").length, lastModified: 2, text: async () => files.get(n) }), createWritable: async () => { let b = ""; return { write: async (t) => { b += t; }, close: async () => { files.set(n, b); } }; } }),
+      removeEntry: async (n) => { files.delete(n); },
+    };
+    files.set("fsp-bundle-dt-bbbbbb-20261005-aaaa.json", JSON.stringify(P.makeBundle({ origin: "dt-bbbbbb", envelopes: [{ fsp: 1, type: "ping", id: "rec-d9", vv: { "dt-bbbbbb": 1 }, updatedAt: "2026-10-05T11:00:00.000Z", deleted: false, origin: "dt-bbbbbb", data: { note: "<b>hello</b> from the mac" } }], acks: [], now: T0 })));
+    a.w.showDirectoryPicker = async () => dir;
+    a.w.location.hash = "#/device-check"; a.w.location.hash = "#/sync";
+    await a.waitFor(() => a.$("#folderChoose"), "the Choose folder button");
+    check(!a.$("#folderSync"), "no Sync now before a folder is chosen");
+    a.$("#folderChoose").click();
+    await a.waitFor(() => a.$("#folderSync"), "Sync now after choosing");
+    check(a.text("#main").includes("FieldScanPro Sync"), "the folder name is shown");
+    a.$("#folderSync").click();
+    await a.waitFor(() => /1 new or updated record/.test(a.text("#folderCardResult")), "the sync result");
+    check(!a.$("#folderCardResult .error"), "a good sync is not shown as an error");
+    check([...files.keys()].some((n) => n.indexOf("fsp-bundle-" + "dt-") !== 0), "the receipt file was written to the folder");
+    check(a.$$("#main b").every((b) => b.textContent !== "hello"), "text from a file is never treated as markup");
+    check(/Last sync/.test(a.text("#main")), "last sync is shown");
+    a.$("#folderForget").click();
+    await a.waitFor(() => a.$("#folderChoose") && !a.$("#folderSync"), "forget returns to the start");
+    check(a.errors.length === 0, "no script errors: " + a.errors.join("; "));
+    console.log("Confirmed: fallback message, choose, Sync now, receipt written, forget");
+  }
+
   console.log("\n\u2705 ALL APP SCREEN TESTS PASSED");
   process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

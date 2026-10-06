@@ -50,6 +50,7 @@ async function boot() {
     fsp.db = await FSPDb.open();
     fsp.sync = FSPSync.createSync({ db: fsp.db, protocol: FSPProtocol });
     await fsp.sync.getDeviceId();
+    fsp.folder = FSPFolderSync.createFolderSync({ sync: fsp.sync, db: fsp.db, protocol: FSPProtocol });
     requestPersistentStorage();
   } catch (e) {
     // Calculators don't use storage, so they keep working; only Sync is affected.
@@ -86,6 +87,8 @@ async function renderSyncScreen() {
   }
 
   const status = await fsp.sync.getStatus();
+  const folder = await fsp.folder.status();
+  const canPickFolder = typeof window.showDirectoryPicker === "function";
   const projects = await fsp.sync.listProjects();
   const pings = await fsp.sync.getRecords("ping");
   const c = status.counts;
@@ -109,8 +112,32 @@ async function renderSyncScreen() {
       }).join("")
     : `<p class="muted">None yet.</p>`;
 
+  const FOLDER_STATE = {
+    granted: "Ready to sync.",
+    prompt: "Chrome will ask you to allow access when you tap Sync now.",
+    denied: "Access was refused. Tap Sync now and choose Allow, or choose the folder again.",
+    error: "The folder can't be reached. Choose it again.",
+  };
+  const folderCard = !canPickFolder
+    ? `<p class="muted">This browser can't open a folder directly. Use the file steps below instead.</p>`
+    : folder.state === "none"
+      ? `<p class="muted">Choose the folder your sync app (Syncthing) keeps in step with the desktop. After that, one tap on Sync now does everything.</p>
+         <button class="btn block" id="folderChoose">Choose sync folder</button>`
+      : `<p><b>${escapeHtml(folder.name)}</b></p>
+         <p class="muted">${escapeHtml(FOLDER_STATE[folder.state] || "")}${folder.lastSync ? ` Last sync ${escapeHtml(formatWhen(folder.lastSync))}: ${escapeHtml(folder.lastSummary || "")}` : ""}</p>
+         <button class="btn block" id="folderSync">Sync now</button>
+         <button class="btn secondary block" id="folderChoose" style="margin-top:8px;">Choose a different folder</button>
+         <button class="btn secondary block" id="folderForget" style="margin-top:8px;">Forget folder</button>`;
+
   main.innerHTML = `
     <h2>Sync</h2>
+
+
+    <div class="card">
+      <h3>Sync folder</h3>
+      ${folderCard}
+      <div id="folderCardResult"></div>
+    </div>
 
     <div class="card">
       <h3>Project list from the desktop</h3>
@@ -153,6 +180,33 @@ async function renderSyncScreen() {
       <p class="muted">Device ID <b>${escapeHtml(status.deviceId)}</b> \u00b7 App version ${escapeHtml(APP_VERSION)}</p>
       <a class="btn secondary block" href="#/device-check" style="text-align:center; text-decoration:none;">Device check</a>
     </div>`;
+
+  const chooseBtn = document.getElementById("folderChoose");
+  if (chooseBtn) chooseBtn.onclick = async (ev) => {
+    await withBusy(ev.currentTarget, async () => {
+      const r = await fsp.folder.chooseFolder((opts) => window.showDirectoryPicker(opts));
+      await renderSyncScreen();
+      if (r.cancelled) return;
+      const lines = r.ok
+        ? [`Using the folder \u201c${r.name}\u201d.`].concat(r.remembered ? [] : ["Chrome would not remember it, so you'll need to choose it again next time."])
+        : [r.error];
+      document.getElementById("folderCardResult").innerHTML = resultBox(lines, !r.ok);
+    });
+  };
+  const syncBtn = document.getElementById("folderSync");
+  if (syncBtn) syncBtn.onclick = async (ev) => {
+    await withBusy(ev.currentTarget, async () => {
+      const r = await fsp.folder.syncNow();
+      await renderSyncScreen();
+      const lines = r.ok ? r.lines.concat(r.problems.map((p) => `${p.file}: ${p.reason}`)) : [r.error];
+      document.getElementById("folderCardResult").innerHTML = resultBox(lines, !r.ok || r.problems.length > 0);
+    });
+  };
+  const forgetBtn = document.getElementById("folderForget");
+  if (forgetBtn) forgetBtn.onclick = async () => {
+    await fsp.folder.forgetFolder();
+    await renderSyncScreen();
+  };
 
   document.getElementById("syncImport").onclick = () => document.getElementById("syncImportInput").click();
 
