@@ -43,6 +43,99 @@ async function phDownloadAll(items, label) {
   }
 }
 
+const phList = async (parent) => (await fsp.sync.getRecords("photo")).filter((r) => r.data.parentId === parent.id)
+  .sort((a, b) => String(a.data.takenAt || "").localeCompare(String(b.data.takenAt || "")));
+
+/** Rotated copy of a photo -> { mime, b64, width, height }. Replaceable in tests (window.phRotateImpl). */
+function phRotate(photo, degrees) {
+  if (window.phRotateImpl) return window.phRotateImpl(photo, degrees);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const quarter = Math.abs(degrees) % 180 === 90;
+      const canvas = document.createElement("canvas");
+      canvas.width = quarter ? img.naturalHeight : img.naturalWidth;
+      canvas.height = quarter ? img.naturalWidth : img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((degrees * Math.PI) / 180);
+      ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+      resolve({ mime: "image/jpeg", b64: canvas.toDataURL("image/jpeg", 0.8).split(",")[1], width: canvas.width, height: canvas.height });
+    };
+    img.onerror = () => reject(new Error("The app couldn't rotate that photo."));
+    img.src = `data:${photo.data.mime};base64,${photo.data.b64}`;
+  });
+}
+
+/**
+ * Full-screen viewer for one photo: previous / next, rotate, download, delete. A photo itself is never edited in place:
+ * rotating or editing saves the changed copy in the same position and removes the original, so syncing stays simple and safe.
+ */
+async function phOpenViewer(parent, label, startIndex, onClose) {
+  let photos = await phList(parent);
+  let index = Math.min(startIndex, photos.length - 1);
+  if (index < 0) return;
+  const el = document.createElement("div");
+  el.id = "phViewer"; el.className = "ph-viewer";
+  el.innerHTML = `<div class="ph-v-top"><span class="ph-v-count"></span><button type="button" class="btn secondary small ph-v-close">Close</button></div>
+    <div class="ph-v-stage"><img class="ph-v-img" alt="Photo"></div>
+    <div class="ph-v-msg"></div>
+    <div class="ph-v-bar">
+      <button type="button" class="btn secondary small ph-v-prev" aria-label="Previous photo">‹</button>
+      <button type="button" class="btn secondary small ph-v-left" aria-label="Rotate left">⟲</button>
+      <button type="button" class="btn secondary small ph-v-right" aria-label="Rotate right">⟳</button>
+      <button type="button" class="btn secondary small ph-v-edit">Crop / draw</button>
+      <button type="button" class="btn secondary small ph-v-down">Download</button>
+      <button type="button" class="btn danger small ph-v-del">Delete</button>
+      <button type="button" class="btn secondary small ph-v-next" aria-label="Next photo">›</button>
+    </div>`;
+  document.body.appendChild(el);
+  const q = (s) => el.querySelector(s);
+  const msg = (t) => { q(".ph-v-msg").textContent = t || ""; };
+  const draw = () => {
+    const p = photos[index];
+    q(".ph-v-img").src = `data:${p.data.mime};base64,${p.data.b64}`;
+    q(".ph-v-count").textContent = `${index + 1} / ${photos.length}`;
+    q(".ph-v-prev").disabled = index === 0;
+    q(".ph-v-next").disabled = index === photos.length - 1;
+    q(".ph-v-del").textContent = "Delete";
+    msg("");
+  };
+  const close = () => { el.remove(); if (onClose) onClose(); };
+  const replaceWith = async (make) => {
+    const old = photos[index];
+    try {
+      const s = await make(old);
+      if (!s) return;
+      await fsp.sync.createRecord({
+        type: "photo", companyKey: parent.companyKey, projectId: parent.projectId || undefined,
+        data: { ...old.data, mime: s.mime, b64: s.b64, width: s.width, height: s.height },
+      });
+      await fsp.sync.deleteRecord(old.id);
+      photos = await phList(parent);
+      draw();
+    } catch (e) { msg(e.message || String(e)); }
+  };
+  const rotate = (deg) => replaceWith((old) => phRotate(old, deg));
+  q(".ph-v-edit").onclick = () => replaceWith((old) => phEdit(old));
+  q(".ph-v-close").onclick = close;
+  q(".ph-v-prev").onclick = () => { if (index > 0) { index--; draw(); } };
+  q(".ph-v-next").onclick = () => { if (index < photos.length - 1) { index++; draw(); } };
+  q(".ph-v-left").onclick = () => rotate(-90);
+  q(".ph-v-right").onclick = () => rotate(90);
+  q(".ph-v-down").onclick = async () => { await phDownloadAll([{ photo: photos[index], index }], label); msg("Saved to this phone's Downloads."); };
+  q(".ph-v-del").onclick = async () => {
+    const b = q(".ph-v-del");
+    if (b.textContent === "Delete") { b.textContent = "Tap again to delete"; return; }
+    await fsp.sync.deleteRecord(photos[index].id);
+    photos = await phList(parent);
+    if (!photos.length) { close(); return; }
+    index = Math.min(index, photos.length - 1);
+    draw();
+  };
+  draw();
+}
+
 async function phMount(box, parent, label) {
   if (!box) return;
   const photos = (await fsp.sync.getRecords("photo")).filter((r) => r.data.parentId === parent.id)
@@ -51,7 +144,8 @@ async function phMount(box, parent, label) {
     <div class="ph-grid">${photos.map((p) => `<div class="ph-item" data-id="${escapeHtml(p.id)}">
       <img src="data:${escapeHtml(p.data.mime)};base64,${p.data.b64}" alt="Photo">
       <input type="checkbox" class="ph-pick" aria-label="Select photo">
-      <button type="button" class="btn danger small ph-del" aria-label="Remove photo">×</button></div>`).join("")}</div>
+      <button type="button" class="ph-del" aria-label="Remove photo">×</button></div>`).join("")}</div>
+    ${photos.length ? `<p class="muted" style="font-size:12px; margin:0 0 8px;">Tap a photo to view, rotate or delete it.</p>` : ""}
     <label class="btn secondary block ph-add">Add photo<input type="file" class="ph-file" accept="image/*" capture="environment" multiple hidden></label>
     ${photos.length ? `<label class="field"><input type="checkbox" class="ph-all"> Select all</label><button type="button" class="btn secondary block ph-save" style="margin-top:8px;">Download selected</button>
       <p class="muted" style="font-size:12px;">Photos go to this phone's Downloads. If a file with the same name is already there, Chrome keeps both and adds (1) to the new one; the browser doesn't let the app replace it.</p>` : ""}
@@ -79,6 +173,9 @@ async function phMount(box, parent, label) {
     await phDownloadAll(items, label);
     box.querySelector(".ph-result").innerHTML = resultBox([`${items.length} photo${items.length === 1 ? "" : "s"} saved to this phone's Downloads.`]);
   };
+  box.querySelectorAll(".ph-item img").forEach((img) => {
+    img.onclick = () => phOpenViewer(parent, label, photos.findIndex((p) => p.id === img.closest(".ph-item").dataset.id), () => phMount(box, parent, label));
+  });
   box.querySelectorAll(".ph-del").forEach((b) => {
     b.onclick = async () => { await fsp.sync.deleteRecord(b.closest(".ph-item").dataset.id); await phMount(box, parent, label); };
   });

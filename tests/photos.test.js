@@ -110,6 +110,37 @@ const photoIs = (a) => a.$$(".ph-item");
   await a.waitFor(() => photoIs(a).length === 1, "one removed");
   check((await a.w.fsp.sync.getRecords("photo")).length === 1, "removed from the store");
 
+  // viewer: tap a picture, rotate, next/prev, delete
+  a.setFiles(a.$(".ph-file"), [{ name: "e.jpg" }]);
+  await a.waitFor(() => photoIs(a).length === 2, "second photo back");
+  const ROT = Buffer.from("rotated").toString("base64");
+  a.w.phRotateImpl = async (photo, deg) => ({ mime: "image/jpeg", b64: ROT, width: 6, height: 8 });
+  a.$(".ph-item img").click();
+  await a.waitFor(() => a.$("#phViewer"), "viewer opens");
+  check(/1 \/ 2/.test(a.text(".ph-v-count")) && a.$(".ph-v-img").src.includes(JPG), "viewer shows the tapped photo");
+  a.$(".ph-v-next").click();
+  check(/2 \/ 2/.test(a.text(".ph-v-count")) && a.$(".ph-v-next").disabled, "next works, ends at last");
+  a.$(".ph-v-right").click();
+  await a.waitFor(() => a.$(".ph-v-img").src.includes(ROT), "rotated copy shown");
+  ph = await a.w.fsp.sync.getRecords("photo");
+  check(ph.length === 2 && ph.filter((x) => x.data.b64 === ROT).length === 1 && /2 \/ 2/.test(a.text(".ph-v-count")), "rotation replaced the photo, count and place kept");
+  const EDT = Buffer.from("edited").toString("base64");
+  let opened = null;
+  a.w.phEditImpl = async (photo) => { opened = photo; return { mime: "image/jpeg", b64: EDT, width: 3, height: 3 }; };
+  a.$(".ph-v-edit").click();
+  await a.waitFor(() => a.$(".ph-v-img").src.includes(EDT), "edited copy shown");
+  ph = await a.w.fsp.sync.getRecords("photo");
+  check(opened && opened.data.b64 === ROT && ph.length === 2 && /2 \/ 2/.test(a.text(".ph-v-count")), "editor got the current photo; the edit replaced it in place");
+  a.w.phEditImpl = async () => null;
+  a.$(".ph-v-edit").click(); await new Promise((r) => setTimeout(r, 20));
+  check(a.$(".ph-v-img").src.includes(EDT) && (await a.w.fsp.sync.getRecords("photo")).length === 2, "cancelling the editor changes nothing");
+  a.$(".ph-v-del").click();
+  check((await a.w.fsp.sync.getRecords("photo")).length === 2, "delete needs a second tap");
+  a.$(".ph-v-del").click();
+  await a.waitFor(() => /1 \/ 1/.test(a.text(".ph-v-count")), "deleted inside viewer");
+  a.$(".ph-v-close").click();
+  await a.waitFor(() => !a.$("#phViewer") && photoIs(a).length === 1, "closed, grid refreshed");
+
   // inspection: new form says save first, edit form has photos
   await a.w.fsp.sync.importFiles([file("p2.json", snap(CO, "PI Projects", ["p1"]))]);
   await go(a, "#/inspections/new", "New inspection");
