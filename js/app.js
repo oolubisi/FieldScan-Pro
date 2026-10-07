@@ -1,6 +1,6 @@
 // ===== App shell: boot, routing, and the Sync screen =====
 
-const APP_VERSION = "0.7.0 (Backup, lock & history)";
+const APP_VERSION = "0.7.1 (Help)";
 const fsp = { db: null, sync: null, storageError: null };
 window.APP_VERSION = APP_VERSION;
 window.fsp = fsp;
@@ -16,8 +16,12 @@ const ROUTES = {
   calculators: { tab: "calculators", render: () => renderCalculatorsSection() },
   sync: { tab: "sync", render: () => renderSyncScreen() },
   safety: { tab: "sync", render: () => renderSafetyScreen() },
+  help: { tab: "sync", render: () => renderHelpScreen() },
   "device-check": { tab: "sync", render: () => renderProbeScreen() },
 };
+
+/** The Help screen (guides for both the desktop and the phone). */
+function renderHelpScreen() { helpRender(document.getElementById("main"), escapeHtml); }
 
 function currentRoute() {
   const m = /^#\/([a-z-]+)/.exec(location.hash);
@@ -210,6 +214,7 @@ async function renderSyncScreen() {
     <div class="card">
       <h3>This phone</h3>
       <p class="muted">Device ID <b>${escapeHtml(status.deviceId)}</b> \u00b7 App version ${escapeHtml(APP_VERSION)}</p>
+      <a class="btn secondary block" href="#/help" style="text-align:center; text-decoration:none; margin-bottom:8px;">Help</a>
       <a class="btn secondary block" href="#/safety" style="text-align:center; text-decoration:none; margin-bottom:8px;">Backup, storage, lock &amp; history</a>
       <a class="btn secondary block" href="#/device-check" style="text-align:center; text-decoration:none;">Device check</a>
     </div>`;
