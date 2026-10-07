@@ -104,3 +104,11 @@ If Chrome asks for permission after the app was closed, tap Allow. The manual im
 ## Tasks
 
 Open the **Tasks** tab. Type a task and tap Add (separate several with `;`). Tap the circle to mark done; tap a task to edit its notes, project, group or delete it. With several companies, pick the company first. Groups are created and renamed on the desktop; the phone can assign a task to an existing group. Tasks sync both ways with the desktop's **Tasks** section; if both sides edit the same task, the Sync tab shows a decision screen ("Keep the phone's / Keep the desktop's").
+
+## Inspections
+
+Open the **Inspect** tab. Tap **New inspection**: title, project, location, inspector (remembered), date and observations. The longer Introduction field and the printed report are on the desktop. Edit or delete from the list. Inspections sync both ways.
+
+## Photos
+
+Tasks, Inspections and Take-Off cards each have a **Photos** section on their edit screen (save the record first). Photos are shrunk to 1280 px JPEG on the phone before being stored, so each is a few hundred KB. They can be added or removed but not edited, and are deleted together with their record. They travel as separate records through the sync folder.

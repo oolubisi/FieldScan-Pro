@@ -65,6 +65,7 @@ function toDescribe(type, snap) {
     if (d.notes) lines.push(`Notes: ${d.notes}`);
     return lines;
   }
+  if (type === "inspection") return [`Inspection: ${d.title || "(no title)"}`].concat(d.inspectionDate ? [`Date: ${d.inspectionDate}`] : [], d.location ? [`Location: ${d.location}`] : [], d.conclusion ? [`Observations: ${String(d.conclusion).slice(0, 200)}`] : []);
   if (type === "task-group") return [`Task group: ${d.name || "(no name)"}`];
   if (type === "task") return [`Task: ${d.title || "(no title)"}`, `Status: ${d.status || "Open"}`].concat(d.notes ? [`Notes: ${d.notes}`] : []);
   return Object.keys(d).slice(0, 8).map((k) => `${k}: ${typeof d[k] === "object" ? "…" : String(d[k])}`);
@@ -254,6 +255,7 @@ async function renderTakeoffCard(groupId, cardId) {
       <label class="field">Date<input id="toDate" type="date" value="${escapeHtml(d.date || "")}"></label>
       <label class="field">Notes<textarea id="toNotes" rows="3">${escapeHtml(d.notes || "")}</textarea></label>
     </div>
+    ${card ? `<div class="card" id="toPhotos"></div>` : `<p class="muted">Save the take-off first, then add photos.</p>`}
     <div class="card"><h3>Items</h3>
       <div id="toLines">${lines.map(toLineRowHtml).join("")}</div>
       <div class="toolbar">
@@ -267,6 +269,7 @@ async function renderTakeoffCard(groupId, cardId) {
     </div>
     <div id="toResult"></div>`;
 
+  if (card) phMount(document.getElementById("toPhotos"), card);
   const box = document.getElementById("toLines");
   if (!lines.length) box.insertAdjacentHTML("beforeend", toLineRowHtml({ id: toNewLineId(), kind: "item" }));
   box.onclick = (ev) => { const b = ev.target.closest(".to-remove"); if (b) b.closest(".to-line").remove(); };

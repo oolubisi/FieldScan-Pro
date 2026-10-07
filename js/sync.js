@@ -112,11 +112,16 @@
     /** Deleting is an edit like any other (a tombstone), so it syncs and can conflict. */
     async function deleteRecord(id) {
       const deviceId = await getDeviceId();
-      return db.readModifyWrite([{ store: "records", key: id }], ([rec]) => {
+      const result = await db.readModifyWrite([{ store: "records", key: id }], ([rec]) => {
         if (!rec) throw new Error("No such record: " + id);
         const next = { ...rec, deleted: true, vv: P.vvBump(rec.vv, deviceId), updatedAt: clock().toISOString(), origin: deviceId };
         return { ops: [{ op: "put", store: "records", value: next }], result: next };
       });
+      // a record's photos go with it
+      if (result.type !== "photo") {
+        for (const ph of (await getRecords("photo")).filter((p) => p.data.parentId === id)) await deleteRecord(ph.id);
+      }
+      return result;
     }
 
     async function getRecords(type) {

@@ -104,3 +104,10 @@ a.btn { display: inline-block; text-align: center; text-decoration: none; }
 .to-qtyrow { display: grid; grid-template-columns: 1fr 1.2fr auto; gap: 6px; }
 .conflict .side { padding: 8px 0; border-bottom: 1px solid #eef0f3; }
 .conflict .side-title { font-weight: 800; }
+
+/* photos */
+.ph-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.ph-item { position: relative; }
+.ph-item img { height: 96px; border-radius: 8px; display: block; }
+.ph-item .ph-del { position: absolute; top: 2px; right: 2px; }
+.ph-add { cursor: pointer; text-align: center; }

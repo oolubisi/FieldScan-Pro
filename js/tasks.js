@@ -124,8 +124,10 @@ async function renderTaskEdit(taskId) {
       <label class="field">Group<select id="tsGroup"><option value="">No group</option>${groups.map((g) => `<option value="${escapeHtml(g.id)}" ${g.id === t.data.groupId ? "selected" : ""}>${escapeHtml(g.data.name || "Untitled group")}</option>`).join("")}</select></label>
       <label class="field"><input id="tsDone" type="checkbox" ${t.data.status === "Done" ? "checked" : ""}> Done</label>
     </div>
+    <div class="card" id="tsPhotos"></div>
     <div class="toolbar"><button class="btn" id="tsSave">Save</button><button class="btn danger" id="tsDelete">Delete</button></div>
     <div id="tsResult"></div>`;
+  phMount(document.getElementById("tsPhotos"), t);
   document.getElementById("tsSave").onclick = (ev) => withBusy(ev.currentTarget, async () => {
     const title = document.getElementById("tsTitle").value.trim();
     if (!title) { document.getElementById("tsResult").innerHTML = resultBox(["Enter a title."], true); return; }
