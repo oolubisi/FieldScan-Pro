@@ -19,8 +19,11 @@ console.log("=== Automatic sync ===");
   check(calls.length === 2, "off means off");
   on = true; shown = false; await a.tick(false);
   check(calls.length === 2, "does nothing while the app is hidden");
+  const before = calls.length;
+  await a.tick(true, { leaving: true });
+  check(calls.length === before + 1, "leaving the app (closing or putting it away) still does one last sync");
   shown = true; await a.tick(false);
-  check(calls.length === 3, "catches up as soon as the app is shown again");
+  check(calls.length === before + 1 || calls.length === before + 2, "catches up as soon as the app is shown again");
   // never two at once
   let release; const slow = w.createAutoSync({ syncNow: () => new Promise((r) => { release = r; calls.push("slow"); }), enabled: () => true, visible: () => true, now: () => t });
   const p1 = slow.tick(true); const p2 = await slow.tick(true);

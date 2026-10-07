@@ -1,5 +1,6 @@
 // ===== Automatic sync every 10 minutes (phone) =====
-// Chrome only lets a web app use the sync folder while the app is open, so this runs while FieldScan Pro is open
+// Syncs when the app opens, every 10 minutes, and when it is closed or put away (best effort: Chrome may stop a page
+// quickly once it is hidden). Chrome only lets a web app use the sync folder while the app is open, so this runs while FieldScan Pro is open
 // on screen. It never asks for permission by itself: if Chrome has forgotten the folder it pauses and says so.
 
 const AS_INTERVAL_MS = 10 * 60 * 1000;
@@ -21,9 +22,9 @@ function createAutoSync({ syncNow, enabled, visible, now, onResult, intervalMs }
   const every = intervalMs || AS_INTERVAL_MS;
   const clock = now || (() => Date.now());
   let last = 0, running = false, timer = null;
-  async function tick(force) {
+  async function tick(force, opts) {
     if (running || !enabled()) return null;
-    if (!visible()) return null;
+    if (!visible() && !(opts && opts.leaving)) return null; // leaving: the app is being closed or put away, which is the last chance to sync
     if (!force && last && clock() - last < every) return null;
     running = true;
     try {
@@ -40,7 +41,8 @@ function createAutoSync({ syncNow, enabled, visible, now, onResult, intervalMs }
   function start() {
     if (timer) return;
     timer = setInterval(() => tick(false), Math.min(every, 60 * 1000)); // looks every minute; runs when 10 minutes have passed
-    document.addEventListener("visibilitychange", () => { if (visible()) tick(false); }); // coming back to the app catches up at once
+    document.addEventListener("visibilitychange", () => { if (visible()) tick(false); else tick(true, { leaving: true }); }); // back: catch up; away: one last sync
+    window.addEventListener("pagehide", () => { tick(true, { leaving: true }); });
     tick(true);
   }
   return { start, tick, lastRun: () => last };

@@ -151,8 +151,8 @@ async function renderSyncScreen() {
          <button class="btn block" id="folderChoose">Choose sync folder</button>`
       : `<p><b>${escapeHtml(folder.name)}</b></p>
          <p class="muted">${escapeHtml(FOLDER_STATE[folder.state] || "")}${folder.lastSync ? ` Last sync ${escapeHtml(formatWhen(folder.lastSync))}: ${escapeHtml(folder.lastSummary || "")}` : ""}</p>
-         <label style="display:flex;gap:10px;align-items:center;font-weight:600;margin:10px 0;"><input type="checkbox" id="autoSyncBox" ${asEnabled() ? "checked" : ""}> Sync automatically every 10 minutes</label>
-         <p class="muted" id="autoSyncNote" style="margin-top:0;">${asEnabled() ? (fsp.autoSync && fsp.autoSync.lastAt ? `Last automatic sync ${escapeHtml(formatWhen(new Date(fsp.autoSync.lastAt).toISOString()))}. ` : "") + "Works while this app is open on screen; Chrome doesn't let it sync when closed." : "Automatic sync is off."}</p>
+         <label style="display:flex;gap:10px;align-items:center;font-weight:600;margin:10px 0;"><input type="checkbox" id="autoSyncBox" ${asEnabled() ? "checked" : ""}> Sync automatically (every 10 minutes, on opening and on closing)</label>
+         <p class="muted" id="autoSyncNote" style="margin-top:0;">${asEnabled() ? (fsp.autoSync && fsp.autoSync.lastAt ? `Last automatic sync ${escapeHtml(formatWhen(new Date(fsp.autoSync.lastAt).toISOString()))}. ` : "") + "Chrome only allows syncing while the app is open, so closing it does one last quick sync as it goes." : "Automatic sync is off."}</p>
          <button class="btn block" id="folderSync">Sync now</button>
          <button class="btn secondary block" id="folderChoose" style="margin-top:8px;">Choose a different folder</button>
          <button class="btn secondary block" id="folderForget" style="margin-top:8px;">Forget folder</button>`;
