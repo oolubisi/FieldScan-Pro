@@ -108,6 +108,10 @@ const rows = (a) => a.$$("a.link-row");
     // inspector remembered
     await go(a, "#/inspections/new", "New inspection");
     check(a.$("#inInspector").value === "Kayode", "last inspector pre-filled");
+    check(a.$("#inProject").value === "p1" && a.$("#inLocation").value === "Lekki", "project and location pre-filled from the previous inspection");
+    check([...a.$$("#inLocations option")].some((o) => o.value === "Lekki") && [...a.$$("#inInspectors option")].some((o) => o.value === "Kayode"), "earlier locations and inspectors are offered as suggestions");
+    a.$("#inProject").value = ""; a.event(a.$("#inProject"), "change");
+    check(a.$("#inLocation").value === "Lekki", "changing to a project with no history leaves what is typed");
 
     // edit keeps what the phone doesn't show
     await a.w.fsp.db.readModifyWrite([{ store: "records", key: recs[0].id }], ([r]) => ({ ops: [{ op: "put", store: "records", value: { ...r, data: { ...r.data, intro: "Scope text", extra: { n: 1 } } } }] }));

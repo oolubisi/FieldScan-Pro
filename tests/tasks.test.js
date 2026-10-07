@@ -113,6 +113,13 @@ const titles = (a) => rows(a).map((r) => r.querySelector("b").textContent);
     check((await a.w.fsp.sync.getRecords("task")).find((r) => r.data.title === "Inspect slab").projectId === "p2", "filed under the selected project");
     a.$("#tsFilter").value = "all"; a.event(a.$("#tsFilter"), "change");
     await a.waitFor(() => rows(a).length === 3, "all three");
+    check(a.$("#tsAddProject").value === "p2", "new tasks default to the project used last");
+    a.$("#tsAddProject").value = ""; a.setValue(a.$("#tsNew"), "General chore"); a.$("#tsAdd").click();
+    await a.waitFor(() => rows(a).length === 4, "chosen project respected");
+    check(!(await a.w.fsp.sync.getRecords("task")).find((r) => r.data.title === "General chore").projectId, "filed under 'No project' when chosen");
+    await a.w.fsp.sync.deleteRecord((await a.w.fsp.sync.getRecords("task")).find((r) => r.data.title === "General chore").id);
+    a.$("#tsFilter").value = "none"; a.event(a.$("#tsFilter"), "change"); a.$("#tsFilter").value = "all"; a.event(a.$("#tsFilter"), "change");
+    await a.waitFor(() => rows(a).length === 3, "back to three");
 
     // complete
     const row = rows(a).find((r) => r.querySelector("b").textContent === "Order cement");

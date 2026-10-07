@@ -111,3 +111,4 @@ a.btn { display: inline-block; text-align: center; text-decoration: none; }
 .ph-item img { height: 96px; border-radius: 8px; display: block; }
 .ph-item .ph-del { position: absolute; top: 2px; right: 2px; }
 .ph-add { cursor: pointer; text-align: center; }
+.ph-item .ph-pick { position: absolute; left: 4px; top: 4px; width: 22px; height: 22px; }

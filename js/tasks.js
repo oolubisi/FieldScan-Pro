@@ -69,6 +69,7 @@ async function renderTaskList() {
     <div class="card">
       <label class="field">Add task<input id="tsNew" maxlength="300" placeholder="e.g. Order cement; Call surveyor"></label>
       ${m.companies.length > 1 ? `<label class="field">Company<select id="tsCompany">${m.companies.map((c) => `<option value="${escapeHtml(c.key)}" ${c.key === lastCompany ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}</select></label>` : ""}
+      <label class="field">Project<select id="tsAddProject"></select></label>
       <button class="btn block" id="tsAdd" style="margin-top:10px;" ${m.companies.length ? "" : "disabled"}>Add</button>
     </div>
     <div class="toolbar"><select id="tsFilter" aria-label="Project"><option value="all">All tasks</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${m.projects.map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select></div>
@@ -78,12 +79,22 @@ async function renderTaskList() {
 
   document.getElementById("tsFilter").onchange = (ev) => { renderTaskList.filter = ev.target.value; renderTaskList(); };
   const company = document.getElementById("tsCompany");
-  if (company) company.onchange = (ev) => { renderTaskList.company = ev.target.value; };
+  // the project for new tasks: the one being viewed, else the one used for the latest task (it can be changed here)
+  const latestTask = [...m.tasks].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
+  const fillAddProjects = (preferred) => {
+    const key = company ? company.value : lastCompany;
+    const list = m.projects.filter((p) => p.companyKey === key);
+    const want = preferred !== undefined ? preferred : (m.projects.find((p) => p.key === filter) || {}).id || (latestTask && latestTask.companyKey === key ? latestTask.projectId : "") || "";
+    document.getElementById("tsAddProject").innerHTML = `<option value="">No project</option>` + list.map((p) => `<option value="${escapeHtml(p.id)}" ${p.id === want ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("");
+  };
+  fillAddProjects();
+  if (company) company.onchange = (ev) => { renderTaskList.company = ev.target.value; fillAddProjects(""); };
   document.getElementById("tsAdd").onclick = (ev) => withBusy(ev.currentTarget, async () => {
     const titles = tsSplitTitles(document.getElementById("tsNew").value);
     if (!titles.length) { showStatus("Type a task first.", true); return; }
     const companyKey = company ? company.value : lastCompany;
-    const project = m.projects.find((p) => p.key === filter);
+    const chosen = document.getElementById("tsAddProject").value;
+    const project = m.projects.find((p) => p.id === chosen && p.companyKey === companyKey);
     const base = Date.now();
     for (let i = 0; i < titles.length; i++) {
       await fsp.sync.createRecord({
@@ -127,7 +138,7 @@ async function renderTaskEdit(taskId) {
     <div class="card" id="tsPhotos"></div>
     <div class="toolbar"><button class="btn" id="tsSave">Save</button><button class="btn danger" id="tsDelete">Delete</button></div>
     <div id="tsResult"></div>`;
-  phMount(document.getElementById("tsPhotos"), t);
+  phMount(document.getElementById("tsPhotos"), t, t.data.title);
   document.getElementById("tsSave").onclick = (ev) => withBusy(ev.currentTarget, async () => {
     const title = document.getElementById("tsTitle").value.trim();
     if (!title) { document.getElementById("tsResult").innerHTML = resultBox(["Enter a title."], true); return; }

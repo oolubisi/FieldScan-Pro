@@ -71,11 +71,19 @@ async function renderInspectionForm(id) {
     main.innerHTML = `${toBackLink("#/inspections", "Inspections")}<div class="card"><h3>Needs your decision</h3><p class="muted">This inspection was changed on both the phone and the desktop. Choose which version to keep before editing it.</p><a class="btn block" href="#/conflicts">Decide now</a></div>`;
     return;
   }
+  // A new inspection starts from the previous one: same company, project, location and inspector (all can be changed).
+  const latest = !r ? [...m.items].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0] : null;
   const d = r ? r.data : {};
-  const companyKey = r ? r.companyKey : (renderInspectionList.company && m.companies.some((c) => c.key === renderInspectionList.company) ? renderInspectionList.company : (m.companies[0] || {}).key);
+  const companyKey = r ? r.companyKey : (renderInspectionList.company && m.companies.some((c) => c.key === renderInspectionList.company) ? renderInspectionList.company : (latest && m.companies.some((c) => c.key === latest.companyKey) ? latest.companyKey : (m.companies[0] || {}).key));
   const filterProject = !r ? m.projects.find((p) => p.key === renderInspectionList.filter) : null;
   const projects = m.projects.filter((p) => p.companyKey === companyKey);
-  const selectedProject = r ? r.projectId : filterProject ? filterProject.id : "";
+  const sameCompany = latest && latest.companyKey === companyKey ? latest : null;
+  const selectedProject = r ? r.projectId : filterProject ? filterProject.id : sameCompany && sameCompany.projectId ? sameCompany.projectId : "";
+  const prefillLocation = r ? d.location || "" : sameCompany && sameCompany.projectId === selectedProject ? sameCompany.data.location || "" : "";
+  const prefillInspector = r ? d.inspectorName || "" : (latest && latest.data.inspectorName) || inLastInspector();
+  const uniq = (list) => [...new Set(list.map((x) => String(x || "").trim()).filter(Boolean))];
+  const locations = uniq(m.items.filter((x) => x.companyKey === companyKey).map((x) => x.data.location));
+  const inspectors = uniq(m.items.map((x) => x.data.inspectorName));
   main.innerHTML = `
     ${toBackLink("#/inspections", "Inspections")}
     <h2>${r ? "Edit inspection" : "New inspection"}</h2>
@@ -83,8 +91,8 @@ async function renderInspectionForm(id) {
       ${!r && m.companies.length > 1 ? `<label class="field">Company<select id="inCompany">${m.companies.map((c) => `<option value="${escapeHtml(c.key)}" ${c.key === companyKey ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}</select></label>` : ""}
       <label class="field">Title<input id="inTitle" maxlength="200" value="${escapeHtml(d.title || "")}" placeholder="e.g. Monthly site inspection"></label>
       <label class="field">Project<select id="inProject"><option value="">No project</option>${projects.map((p) => `<option value="${escapeHtml(p.id)}" ${p.id === selectedProject ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select></label>
-      <label class="field">Location<input id="inLocation" maxlength="200" value="${escapeHtml(d.location || "")}" placeholder="Site / address"></label>
-      <label class="field">Inspector<input id="inInspector" maxlength="120" value="${escapeHtml(r ? d.inspectorName || "" : inLastInspector())}"></label>
+      <label class="field">Location<input id="inLocation" list="inLocations" maxlength="200" value="${escapeHtml(prefillLocation)}" placeholder="Site / address"><datalist id="inLocations">${locations.map((x) => `<option value="${escapeHtml(x)}">`).join("")}</datalist></label>
+      <label class="field">Inspector<input id="inInspector" list="inInspectors" maxlength="120" value="${escapeHtml(prefillInspector)}"><datalist id="inInspectors">${inspectors.map((x) => `<option value="${escapeHtml(x)}">`).join("")}</datalist></label>
       <label class="field">Date<input id="inDate" type="date" value="${escapeHtml(d.inspectionDate || inToday())}"></label>
       <label class="field">Observations<textarea id="inConclusion" rows="7" placeholder="Findings and recommendations">${escapeHtml(d.conclusion || "")}</textarea></label>
     </div>
@@ -92,7 +100,13 @@ async function renderInspectionForm(id) {
     <div class="toolbar"><button class="btn" id="inSave">Save</button>${r ? `<button class="btn danger" id="inDelete">Delete</button>` : ""}</div>
     <div id="inResult"></div>`;
 
-  if (r) phMount(document.getElementById("inPhotos"), r);
+  if (r) phMount(document.getElementById("inPhotos"), r, r.data.title);
+  const projSel = document.getElementById("inProject");
+  if (!r) projSel.onchange = () => {
+    const loc = document.getElementById("inLocation");
+    const prev = [...m.items].filter((x) => x.companyKey === companyKey && (x.projectId || "") === projSel.value && x.data.location).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
+    if (prev && (!loc.value || locations.includes(loc.value))) loc.value = prev.data.location;
+  };
   const company = document.getElementById("inCompany");
   if (company) company.onchange = (ev) => { renderInspectionList.company = ev.target.value; renderInspectionForm(null); };
   document.getElementById("inSave").onclick = (ev) => withBusy(ev.currentTarget, async () => {

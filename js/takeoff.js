@@ -269,7 +269,7 @@ async function renderTakeoffCard(groupId, cardId) {
     </div>
     <div id="toResult"></div>`;
 
-  if (card) phMount(document.getElementById("toPhotos"), card);
+  if (card) phMount(document.getElementById("toPhotos"), card, card.data.title);
   const box = document.getElementById("toLines");
   if (!lines.length) box.insertAdjacentHTML("beforeend", toLineRowHtml({ id: toNewLineId(), kind: "item" }));
   box.onclick = (ev) => { const b = ev.target.closest(".to-remove"); if (b) b.closest(".to-line").remove(); };
