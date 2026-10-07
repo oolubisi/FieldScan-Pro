@@ -154,17 +154,19 @@
       return pruned;
     }
 
-    async function runSync() {
+    async function runSync(opts) {
+      const auto = !!(opts && opts.auto); // a timer run: there is no tap to ask permission with, so it must not ask
       const handle = await store.get().catch(() => null);
       if (!handle) return { ok: false, code: "no-folder", error: "Choose the sync folder first." };
 
       let perm;
       try {
         perm = await handle.queryPermission(MODE);
-        if (perm !== "granted") perm = await handle.requestPermission(MODE); // needs this tap, which it has
+        if (perm !== "granted" && !auto) perm = await handle.requestPermission(MODE); // needs this tap, which it has
       } catch (e) {
         return { ok: false, code: "permission", error: `Chrome could not check folder permission (${errText(e)}).` };
       }
+      if (perm !== "granted" && auto) return { ok: false, code: "permission", error: "Automatic sync is paused: Chrome needs you to allow the folder again. Tap Sync now once." };
       if (perm !== "granted") {
         return { ok: false, code: "permission", error: "Chrome needs your permission to use the folder. Tap Sync now again and choose Allow." };
       }
@@ -263,8 +265,8 @@
     }
 
     /** One sync at a time: a second tap while one is running just waits for that one. */
-    function syncNow() {
-      if (!running) running = runSync().catch((e) => ({ ok: false, code: "unexpected", error: `Unexpected problem: ${errText(e)}` })).finally(() => { running = null; });
+    function syncNow(opts) {
+      if (!running) running = runSync(opts).catch((e) => ({ ok: false, code: "unexpected", error: `Unexpected problem: ${errText(e)}` })).finally(() => { running = null; });
       return running;
     }
 
