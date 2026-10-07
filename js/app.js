@@ -1,11 +1,13 @@
 // ===== App shell: boot, routing, and the Sync screen =====
 
-const APP_VERSION = "0.6.0 (Photo viewer + editor)";
+const APP_VERSION = "0.7.0 (Backup, lock & history)";
 const fsp = { db: null, sync: null, storageError: null };
 window.APP_VERSION = APP_VERSION;
 window.fsp = fsp;
 
 const ROUTES = {
+  diary: { tab: "home", render: () => renderDiaryScreen() },
+  search: { tab: "home", render: () => renderSearchScreen() },
   home: { tab: "home", render: () => renderHomeScreen() },
   takeoff: { tab: "takeoff", render: () => renderTakeoffScreen() },
   tasks: { tab: "tasks", render: () => renderTasksScreen() },
@@ -13,6 +15,7 @@ const ROUTES = {
   conflicts: { tab: "takeoff", render: () => renderConflictsScreen() },
   calculators: { tab: "calculators", render: () => renderCalculatorsSection() },
   sync: { tab: "sync", render: () => renderSyncScreen() },
+  safety: { tab: "sync", render: () => renderSafetyScreen() },
   "device-check": { tab: "sync", render: () => renderProbeScreen() },
 };
 
@@ -70,6 +73,7 @@ function setupTheme() {
 
 async function boot() {
   setupTheme();
+  setupLock();
   registerServiceWorker();
   try {
     fsp.db = await FSPDb.open();
@@ -206,6 +210,7 @@ async function renderSyncScreen() {
     <div class="card">
       <h3>This phone</h3>
       <p class="muted">Device ID <b>${escapeHtml(status.deviceId)}</b> \u00b7 App version ${escapeHtml(APP_VERSION)}</p>
+      <a class="btn secondary block" href="#/safety" style="text-align:center; text-decoration:none; margin-bottom:8px;">Backup, storage, lock &amp; history</a>
       <a class="btn secondary block" href="#/device-check" style="text-align:center; text-decoration:none;">Device check</a>
     </div>`;
 

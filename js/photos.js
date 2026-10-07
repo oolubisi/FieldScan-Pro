@@ -79,6 +79,7 @@ async function phOpenViewer(parent, label, startIndex, onClose) {
   el.id = "phViewer"; el.className = "ph-viewer";
   el.innerHTML = `<div class="ph-v-top"><span class="ph-v-count"></span><button type="button" class="btn secondary small ph-v-close">Close</button></div>
     <div class="ph-v-stage"><img class="ph-v-img" alt="Photo"></div>
+    <div class="ph-v-cap"><input class="ph-v-captext" placeholder="Caption (shown in the report)" maxlength="200"><button type="button" class="btn secondary small ph-v-capsave">Save caption</button></div>
     <div class="ph-v-msg"></div>
     <div class="ph-v-bar">
       <button type="button" class="btn secondary small ph-v-prev" aria-label="Previous photo">‹</button>
@@ -99,6 +100,7 @@ async function phOpenViewer(parent, label, startIndex, onClose) {
     q(".ph-v-prev").disabled = index === 0;
     q(".ph-v-next").disabled = index === photos.length - 1;
     q(".ph-v-del").textContent = "Delete";
+    q(".ph-v-captext").value = p.data.caption || "";
     msg("");
   };
   const close = () => { el.remove(); if (onClose) onClose(); };
@@ -109,7 +111,7 @@ async function phOpenViewer(parent, label, startIndex, onClose) {
       if (!s) return;
       await fsp.sync.createRecord({
         type: "photo", companyKey: parent.companyKey, projectId: parent.projectId || undefined,
-        data: { ...old.data, mime: s.mime, b64: s.b64, width: s.width, height: s.height },
+        data: { ...old.data, ...s },
       });
       await fsp.sync.deleteRecord(old.id);
       photos = await phList(parent);
@@ -117,6 +119,7 @@ async function phOpenViewer(parent, label, startIndex, onClose) {
     } catch (e) { msg(e.message || String(e)); }
   };
   const rotate = (deg) => replaceWith((old) => phRotate(old, deg));
+  q(".ph-v-capsave").onclick = () => replaceWith(async () => ({ caption: q(".ph-v-captext").value.trim().slice(0, 200) }));
   q(".ph-v-edit").onclick = () => replaceWith((old) => phEdit(old));
   q(".ph-v-close").onclick = close;
   q(".ph-v-prev").onclick = () => { if (index > 0) { index--; draw(); } };
@@ -144,7 +147,7 @@ async function phMount(box, parent, label) {
     <div class="ph-grid">${photos.map((p) => `<div class="ph-item" data-id="${escapeHtml(p.id)}">
       <img src="data:${escapeHtml(p.data.mime)};base64,${p.data.b64}" alt="Photo">
       <input type="checkbox" class="ph-pick" aria-label="Select photo">
-      <button type="button" class="ph-del" aria-label="Remove photo">×</button></div>`).join("")}</div>
+      <button type="button" class="ph-del" aria-label="Remove photo">×</button>${p.data.caption ? `<div class="ph-cap">${escapeHtml(p.data.caption)}</div>` : ""}</div>`).join("")}</div>
     ${photos.length ? `<p class="muted" style="font-size:12px; margin:0 0 8px;">Tap a photo to view, rotate or delete it.</p>` : ""}
     <label class="btn secondary block ph-add">Add photo<input type="file" class="ph-file" accept="image/*" capture="environment" multiple hidden></label>
     ${photos.length ? `<label class="field"><input type="checkbox" class="ph-all"> Select all</label><button type="button" class="btn secondary block ph-save" style="margin-top:8px;">Download selected</button>

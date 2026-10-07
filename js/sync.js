@@ -70,6 +70,39 @@
       await db.kvSet("syncLog", entries.slice(0, LOG_LIMIT));
     }
 
+    // ---------- history (what changed, and how to put it back) ----------
+
+    const HISTORY_LIMIT = 150;
+    const recTitle = (d) => (d && (d.title || d.name || d.text || d.date)) || "Untitled";
+
+    /** Remembers a record's PREVIOUS content so a change can be undone. Photos are too big to keep and are skipped. */
+    async function logHistory(prev, source, newData) {
+      if (!prev || prev.type === "photo" || prev.type === "ping") return;
+      const list = await db.kvGet("history", []);
+      list.unshift({
+        n: newRecordId(), recId: prev.id, type: prev.type, at: clock().toISOString(), source,
+        title: recTitle(prev.data), newTitle: recTitle(newData || prev.data),
+        prevData: prev.data, prevDeleted: !!prev.deleted,
+      });
+      await db.kvSet("history", list.slice(0, HISTORY_LIMIT));
+    }
+
+    const getHistory = () => db.kvGet("history", []);
+
+    /** Puts a record back the way it was before the logged change. It is a new edit, so it syncs like any other. */
+    async function undoHistory(n) {
+      const list = await db.kvGet("history", []);
+      const entry = list.find((e) => e.n === n);
+      if (!entry) return { ok: false, error: "That change is no longer in the history." };
+      const rec = await db.get("records", entry.recId);
+      if (!rec) return { ok: false, error: "That record no longer exists on this phone." };
+      if (entry.prevDeleted) await deleteRecord(entry.recId, { noHistory: true });
+      else await saveRecord(entry.recId, entry.prevData, undefined, { noHistory: true });
+      await db.kvSet("history", list.filter((e) => e.n !== n));
+      await log("Undid a change to \u201c" + entry.title + "\u201d");
+      return { ok: true, title: entry.title };
+    }
+
     // ---------- local records ----------
 
     /** "unsent" -> never exported; "sent" -> exported, awaiting confirmation; "delivered" -> confirmed by the desktop */
@@ -99,8 +132,10 @@
     }
 
     /** meta.projectId (optional) moves the record to another project, or to none with "". */
-    async function saveRecord(id, data, meta) {
+    async function saveRecord(id, data, meta, opts) {
       const deviceId = await getDeviceId();
+      const before = opts && opts.noHistory ? null : await db.get("records", id);
+      if (before && JSON.stringify(before.data) !== JSON.stringify(data)) await logHistory(before, "edit", data);
       return db.readModifyWrite([{ store: "records", key: id }], ([rec]) => {
         if (!rec) throw new Error("No such record: " + id);
         const projectId = meta && meta.projectId !== undefined ? meta.projectId || null : rec.projectId;
@@ -110,8 +145,9 @@
     }
 
     /** Deleting is an edit like any other (a tombstone), so it syncs and can conflict. */
-    async function deleteRecord(id) {
+    async function deleteRecord(id, opts) {
       const deviceId = await getDeviceId();
+      if (!(opts && opts.noHistory)) { const before = await db.get("records", id); if (before && !before.deleted) await logHistory(before, "delete"); }
       const result = await db.readModifyWrite([{ store: "records", key: id }], ([rec]) => {
         if (!rec) throw new Error("No such record: " + id);
         const next = { ...rec, deleted: true, vv: P.vvBump(rec.vv, deviceId), updatedAt: clock().toISOString(), origin: deviceId };
@@ -183,7 +219,16 @@
     }
 
     /** Applies one incoming record version, atomically. Returns what happened. */
-    function applyEnvelope(env) {
+    async function applyEnvelope(env) {
+      const local = env.type === "photo" ? null : await db.get("records", env.id);
+      const action = await applyEnvelopeNow(env);
+      if (action === "apply" && local && !local.deleted && (env.deleted || JSON.stringify(local.data) !== JSON.stringify(env.data))) {
+        await logHistory(local, "desktop", env.data);
+      }
+      return action;
+    }
+
+    function applyEnvelopeNow(env) {
       return db.readModifyWrite(
         [{ store: "records", key: env.id }, { store: "conflicts", key: env.id }],
         ([local, conflict]) => {
@@ -397,7 +442,7 @@
 
     return {
       getDeviceId, recordState,
-      createRecord, saveRecord, deleteRecord, getRecords,
+      createRecord, saveRecord, deleteRecord, getRecords, getHistory, undoHistory,
       exportBundle, importText, importFiles, summarizeImport,
       getConflicts, resolveConflict,
       listProjects, getStatus, createPing,

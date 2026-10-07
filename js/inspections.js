@@ -94,13 +94,16 @@ async function renderInspectionForm(id) {
       <label class="field">Location<input id="inLocation" list="inLocations" maxlength="200" value="${escapeHtml(prefillLocation)}" placeholder="Site / address"><datalist id="inLocations">${locations.map((x) => `<option value="${escapeHtml(x)}">`).join("")}</datalist></label>
       <label class="field">Inspector<input id="inInspector" list="inInspectors" maxlength="120" value="${escapeHtml(prefillInspector)}"><datalist id="inInspectors">${inspectors.map((x) => `<option value="${escapeHtml(x)}">`).join("")}</datalist></label>
       <label class="field">Date<input id="inDate" type="date" value="${escapeHtml(d.inspectionDate || inToday())}"></label>
-      <label class="field">Observations<textarea id="inConclusion" rows="7" placeholder="Findings and recommendations">${escapeHtml(d.conclusion || "")}</textarea></label>
+      <label class="field">Observations<textarea id="inConclusion" rows="7" data-dictate placeholder="Findings and recommendations">${escapeHtml(d.conclusion || "")}</textarea></label>
     </div>
+    <div class="card" id="inChecklist"></div>
     ${r ? `<div class="card" id="inPhotos"></div>` : `<p class="muted">Save the inspection first, then add photos.</p>`}
-    <div class="toolbar"><button class="btn" id="inSave">Save</button>${r ? `<button class="btn danger" id="inDelete">Delete</button>` : ""}</div>
+    <div class="toolbar"><button class="btn" id="inSave">Save</button>${r ? `<button class="btn secondary" id="inReport">Report (PDF)</button><button class="btn danger" id="inDelete">Delete</button>` : ""}</div>
     <div id="inResult"></div>`;
 
   if (r) phMount(document.getElementById("inPhotos"), r, r.data.title);
+  dtAttach(main);
+  const checklist = clMount(document.getElementById("inChecklist"), d.items);
   const projSel = document.getElementById("inProject");
   if (!r) projSel.onchange = () => {
     const loc = document.getElementById("inLocation");
@@ -120,10 +123,25 @@ async function renderInspectionForm(id) {
     };
     const projectId = document.getElementById("inProject").value;
     inLastInspector(inspector);
+    data.items = checklist.getItems();
+    // a failed item that asked for a task gets one (once): the task remembers which inspection and item it came from
+    for (const item of data.items) {
+      if (item.result !== "fail" || !item.wantTask || item.taskId) continue;
+      const task = await fsp.sync.createRecord({
+        type: "task", companyKey, projectId: projectId || undefined,
+        data: { title: `Fix: ${item.text}`.slice(0, 300), notes: [`From inspection: ${title}`, item.note].filter(Boolean).join("\n"), status: "Open", groupId: "", sortOrder: Date.now(), inspectionId: r ? r.id : "", inspectionItemId: item.id },
+      });
+      item.taskId = task.id;
+    }
     if (r) await fsp.sync.saveRecord(r.id, data, { projectId });
     else await fsp.sync.createRecord({ type: INSP, data, companyKey, projectId: projectId || undefined });
     location.hash = "#/inspections";
   });
+  const rep = document.getElementById("inReport");
+  if (rep) rep.onclick = async () => {
+    const fresh = (await fsp.sync.getRecords(INSP)).find((x) => x.id === r.id) || r;
+    rpPrintInspection({ ...fresh, data: { ...fresh.data, items: checklist.getItems(), title: document.getElementById("inTitle").value || fresh.data.title, conclusion: document.getElementById("inConclusion").value } }, m.projects, await fsp.sync.getRecords("photo"));
+  };
   const del = document.getElementById("inDelete");
   if (del) del.onclick = () => {
     openModal("Delete inspection?", `<p>“${escapeHtml(d.title || "Untitled")}” will be deleted here and on the desktop.</p>`, async () => {

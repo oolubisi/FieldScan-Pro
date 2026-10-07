@@ -18,6 +18,27 @@ async function tsLoad() {
   return { projects, groups, tasks, companies, conflicts, conflicted: new Set(conflicts.map((c) => c.id)) };
 }
 
+/** Today in this phone's own time zone, as YYYY-MM-DD. */
+function tsToday() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+/** "overdue" | "today" | "soon" (within 3 days) | "" */
+function tsDueStatus(due, today) {
+  if (!due) return "";
+  const t = today || tsToday();
+  if (due < t) return "overdue";
+  if (due === t) return "today";
+  return (new Date(due) - new Date(t)) / 86400000 <= 3 ? "soon" : "";
+}
+function tsDueChip(t) {
+  if (!t.data.dueDate || t.data.status === "Done") return "";
+  const s = tsDueStatus(t.data.dueDate);
+  const kind = s === "overdue" ? "bad" : s === "today" ? "wait" : s === "soon" ? "info" : "";
+  const label = s === "overdue" ? "Overdue · " : s === "today" ? "Due today · " : "Due ";
+  return `<span class="badge ${kind}" style="margin-top:3px;">${label}${escapeHtml(t.data.dueDate)}</span>`;
+}
+
 const tsOrder = (t) => Number(t.data.sortOrder) || 0;
 const tsProject = (m, t) => m.projects.find((p) => p.id === t.projectId && p.companyKey === t.companyKey);
 
@@ -47,7 +68,7 @@ function tsRow(m, t) {
     <a class="grow ts-open" href="#/tasks/${escapeHtml(t.id)}" style="color:inherit;text-decoration:none;">
       <b style="${done ? "text-decoration:line-through;" : ""}">${escapeHtml(t.data.title || "Untitled")}</b>
       ${t.data.notes ? `<div class="sub">${escapeHtml(t.data.notes.slice(0, 80))}</div>` : ""}
-      ${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ""}</a>
+      ${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ""}${tsDueChip(t)}</a>
     <span class="badge ${kind}">${label}</span></div>`;
 }
 
@@ -57,7 +78,9 @@ async function renderTaskList() {
   const filter = renderTaskList.filter || "all";
   const lastCompany = renderTaskList.company && m.companies.some((c) => c.key === renderTaskList.company) ? renderTaskList.company : (m.companies[0] || {}).key;
   const shown = m.tasks.filter((t) => filter === "all" || (filter === "none" ? !t.projectId : `${t.companyKey}:${t.projectId}` === filter));
-  const open = shown.filter((t) => t.data.status !== "Done").sort((a, b) => tsOrder(b) - tsOrder(a));
+  const dueOnly = renderTaskList.due === "overdue";
+  const open = shown.filter((t) => t.data.status !== "Done" && (!dueOnly || tsDueStatus(t.data.dueDate) === "overdue"))
+    .sort((a, b) => (a.data.dueDate || "9999").localeCompare(b.data.dueDate || "9999") || tsOrder(b) - tsOrder(a));
   const done = shown.filter((t) => t.data.status === "Done").sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
   const groupsWithOpen = m.groups.filter((g) => open.some((t) => t.data.groupId === g.id));
   const ungrouped = open.filter((t) => !t.data.groupId || !m.groups.some((g) => g.id === t.data.groupId));
@@ -72,12 +95,14 @@ async function renderTaskList() {
       <label class="field">Project<select id="tsAddProject"></select></label>
       <button class="btn block" id="tsAdd" style="margin-top:10px;" ${m.companies.length ? "" : "disabled"}>Add</button>
     </div>
-    <div class="toolbar"><select id="tsFilter" aria-label="Project"><option value="all">All tasks</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${m.projects.map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select></div>
+    <div class="toolbar"><select id="tsFilter" aria-label="Project"><option value="all">All tasks</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${m.projects.map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select>
+      <select id="tsDueFilter" aria-label="Due"><option value="">Any due date</option><option value="overdue" ${dueOnly ? "selected" : ""}>Overdue only</option></select></div>
     ${groupsWithOpen.map((g) => `<div class="card"><h3>${escapeHtml(g.data.name || "Untitled group")}</h3>${open.filter((t) => t.data.groupId === g.id).map((t) => tsRow(m, t)).join("")}</div>`).join("")}
     ${ungrouped.length ? `<div class="card">${ungrouped.map((t) => tsRow(m, t)).join("")}</div>` : (groupsWithOpen.length ? "" : `<div class="empty-state">${shown.length ? "Nothing open. Well done." : "No tasks yet."}</div>`)}
     ${done.length ? `<details class="card"><summary><b>Done (${done.length})</b></summary>${done.map((t) => tsRow(m, t)).join("")}</details>` : ""}`;
 
   document.getElementById("tsFilter").onchange = (ev) => { renderTaskList.filter = ev.target.value; renderTaskList(); };
+  document.getElementById("tsDueFilter").onchange = (ev) => { renderTaskList.due = ev.target.value; renderTaskList(); };
   const company = document.getElementById("tsCompany");
   // the project for new tasks: the one being viewed, else the one used for the latest task (it can be changed here)
   const latestTask = [...m.tasks].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
@@ -130,22 +155,25 @@ async function renderTaskEdit(taskId) {
     <h2>Edit task</h2>
     <div class="card">
       <label class="field">Title<input id="tsTitle" maxlength="300" value="${escapeHtml(t.data.title || "")}"></label>
-      <label class="field">Notes<textarea id="tsNotes" rows="4">${escapeHtml(t.data.notes || "")}</textarea></label>
+      <label class="field">Notes<textarea id="tsNotes" rows="4" data-dictate>${escapeHtml(t.data.notes || "")}</textarea></label>
       <label class="field">Project<select id="tsProject"><option value="">No project</option>${projects.map((p) => `<option value="${escapeHtml(p.id)}" ${p.id === t.projectId ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select></label>
       <label class="field">Group<select id="tsGroup"><option value="">No group</option>${groups.map((g) => `<option value="${escapeHtml(g.id)}" ${g.id === t.data.groupId ? "selected" : ""}>${escapeHtml(g.data.name || "Untitled group")}</option>`).join("")}</select></label>
+      <label class="field">Due date<input id="tsDueDate" type="date" value="${escapeHtml(t.data.dueDate || "")}"></label>
       <label class="field"><input id="tsDone" type="checkbox" ${t.data.status === "Done" ? "checked" : ""}> Done</label>
     </div>
     <div class="card" id="tsPhotos"></div>
     <div class="toolbar"><button class="btn" id="tsSave">Save</button><button class="btn danger" id="tsDelete">Delete</button></div>
     <div id="tsResult"></div>`;
+  dtAttach(main);
   phMount(document.getElementById("tsPhotos"), t, t.data.title);
   document.getElementById("tsSave").onclick = (ev) => withBusy(ev.currentTarget, async () => {
     const title = document.getElementById("tsTitle").value.trim();
     if (!title) { document.getElementById("tsResult").innerHTML = resultBox(["Enter a title."], true); return; }
-    await fsp.sync.saveRecord(t.id, {
-      ...t.data, title, notes: document.getElementById("tsNotes").value,
-      groupId: document.getElementById("tsGroup").value, status: document.getElementById("tsDone").checked ? "Done" : "Open",
-    }, { projectId: document.getElementById("tsProject").value });
+    const due = document.getElementById("tsDueDate").value;
+    const next = { ...t.data, title, notes: document.getElementById("tsNotes").value,
+      groupId: document.getElementById("tsGroup").value, status: document.getElementById("tsDone").checked ? "Done" : "Open" };
+    if (due) next.dueDate = due; else delete next.dueDate;
+    await fsp.sync.saveRecord(t.id, next, { projectId: document.getElementById("tsProject").value });
     location.hash = "#/tasks";
   });
   document.getElementById("tsDelete").onclick = () => {

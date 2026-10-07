@@ -176,3 +176,36 @@ a.link-card .row { align-items: center; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) [style*="background:#fff"] { background: var(--card) !important; } :root:not([data-theme="light"]) [style*="border:1px solid #ddd"] { border-color: var(--line) !important; } }
 :root[data-theme="dark"] [style*="background:#fff"] { background: var(--card) !important; }
 :root[data-theme="dark"] [style*="border:1px solid #ddd"] { border-color: var(--line) !important; }
+
+#searchBtn { color: #fff; text-decoration: none; font-size: 18px; margin-left: auto; margin-right: 10px; }
+
+.ph-item .ph-cap { max-width: 130px; font-size: 11px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.ph-v-cap { display: flex; gap: 8px; padding: 0 12px 4px; }
+.ph-v-cap input { flex: 1; background: #1c1c1c; color: #fff; border-color: #444; }
+
+.quick { grid-template-columns: repeat(4, 1fr); }
+.dt-btn { margin: 4px 0 0; padding: 6px 12px; border-radius: 16px; border: 1px solid var(--input-line); background: var(--card); color: inherit; font-size: 14px; }
+.dt-btn.on { background: #dc2626; color: #fff; border-color: #dc2626; }
+/* printed reports (Save as PDF) */
+#printArea { display: none; }
+@media print {
+  body > *:not(#printArea) { display: none !important; }
+  #printArea { display: block !important; }
+  html, body { height: auto; background: #fff; color: #000; display: block; }
+  .rp { font-family: Arial, sans-serif; color: #000; padding: 8px; }
+  .rp h1 { margin: 0 0 4px; } .rp h2 { margin: 0 0 14px; font-weight: 400; }
+  .rp-meta, .rp-grid { border-collapse: collapse; width: 100%; margin-bottom: 12px; font-size: 13px; }
+  .rp-meta td { padding: 4px 8px; vertical-align: top; } .rp-meta td:first-child { font-weight: 700; width: 110px; }
+  .rp-grid td { border: 1px solid #999; padding: 4px 6px; } .rp-grid td:last-child { width: 90px; text-align: center; } .rp-fail { font-weight: 700; }
+  .rp-photos { display: flex; flex-wrap: wrap; gap: 10px; } .rp-photo { width: 48%; page-break-inside: avoid; font-size: 12px; } .rp-photo img { width: 100%; }
+  .rp-day { page-break-inside: avoid; margin-bottom: 14px; }
+}
+
+/* ===== Data & security ===== */
+#lockScreen { position: fixed; inset: 0; z-index: 9999; background: var(--bg, #0a0f16); display: flex; align-items: center; justify-content: center; padding: 24px; }
+#lockScreen .lk-box { width: 100%; max-width: 320px; text-align: center; }
+#lockScreen .lk-logo { font-size: 48px; }
+#lockScreen input { width: 100%; font-size: 24px; text-align: center; letter-spacing: 6px; margin: 12px 0 4px; }
+#lockScreen .lk-msg { min-height: 20px; color: #e5484d; margin-bottom: 8px; }
+.meter { height: 10px; border-radius: 6px; background: rgba(128,128,128,.25); overflow: hidden; margin: 8px 0; }
+.meter > div { height: 100%; background: #2f9e6e; }

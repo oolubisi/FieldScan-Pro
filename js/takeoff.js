@@ -66,6 +66,7 @@ function toDescribe(type, snap) {
     return lines;
   }
   if (type === "inspection") return [`Inspection: ${d.title || "(no title)"}`].concat(d.inspectionDate ? [`Date: ${d.inspectionDate}`] : [], d.location ? [`Location: ${d.location}`] : [], d.conclusion ? [`Observations: ${String(d.conclusion).slice(0, 200)}`] : []);
+  if (type === "diary") return [`Diary: ${d.date || "(no date)"}`].concat(d.weather ? [`Weather: ${d.weather}`] : [], d.progress ? [`Progress: ${String(d.progress).slice(0, 200)}`] : []);
   if (type === "task-group") return [`Task group: ${d.name || "(no name)"}`];
   if (type === "task") return [`Task: ${d.title || "(no title)"}`, `Status: ${d.status || "Open"}`].concat(d.notes ? [`Notes: ${d.notes}`] : []);
   return Object.keys(d).slice(0, 8).map((k) => `${k}: ${typeof d[k] === "object" ? "…" : String(d[k])}`);

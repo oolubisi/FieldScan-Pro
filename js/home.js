@@ -35,6 +35,8 @@ async function hmLoad(now) {
   const [tasks, inspections, cards, photos] = await Promise.all(["task", "inspection", "takeoff", "photo"].map((t) => fsp.sync.getRecords(t)));
   const month = n.toISOString().slice(0, 7);
   const open = tasks.filter((t) => t.data.status !== "Done");
+  const overdue = open.filter((t) => tsDueStatus(t.data.dueDate) === "overdue").length;
+  const dueToday = open.filter((t) => tsDueStatus(t.data.dueDate) === "today").length;
   const done = tasks.length - open.length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   const perProject = projects.map((p) => {
@@ -50,7 +52,7 @@ async function hmLoad(now) {
     return { icon: label(r)[0], kind: label(r)[1], title: r.data.title || "Untitled", project: p ? p.displayNumber : "", when: hmAgo(r.updatedAt, n), href: link(r) };
   });
   return {
-    status, hasProjects: Object.keys(status.projectsMeta).length > 0,
+    overdue, dueToday, status, hasProjects: Object.keys(status.projectsMeta).length > 0,
     openTasks: open.length, pct, inspectionsThisMonth: inspections.filter((r) => String(r.data.inspectionDate || r.updatedAt).startsWith(month)).length,
     cards: cards.length, photos: photos.length, waiting: status.counts.unsent, conflicts: status.conflicts, perProject, activity,
   };
@@ -61,8 +63,11 @@ async function renderHomeScreen() {
   if (!fsp.sync) { main.innerHTML = `<h2>Home</h2><div class="card"><h3>Storage isn't available</h3><p class="muted">This browser isn't letting the app save data.</p></div>`; return; }
   const m = await hmLoad();
   const now = new Date();
+  try { if (navigator.setAppBadge) (m.overdue + m.dueToday) ? navigator.setAppBadge(m.overdue + m.dueToday) : navigator.clearAppBadge(); } catch (e) { /* not supported */ }
   const alerts = [
     m.conflicts ? `<a class="alert" style="--c:var(--bad)" href="#/conflicts">⚠️ <span>${m.conflicts} record${m.conflicts === 1 ? "" : "s"} changed on both phone and desktop. Tap to decide.</span></a>` : "",
+    m.overdue ? `<a class="alert" style="--c:var(--bad)" href="#/tasks" data-overdue>⏰ <span>${m.overdue} task${m.overdue === 1 ? " is" : "s are"} overdue.</span></a>` : "",
+    m.dueToday ? `<a class="alert" style="--c:var(--warn)" href="#/tasks">📅 <span>${m.dueToday} task${m.dueToday === 1 ? " is" : "s are"} due today.</span></a>` : "",
     m.waiting ? `<a class="alert" style="--c:var(--warn)" href="#/sync">⏳ <span>${m.waiting} record${m.waiting === 1 ? "" : "s"} waiting to be sent to the desktop.</span></a>` : "",
     m.hasProjects ? "" : `<a class="alert" style="--c:var(--accent)" href="#/sync">📂 <span>No project list yet. Open Sync to receive it from the desktop.</span></a>`,
   ].join("");
@@ -79,7 +84,7 @@ async function renderHomeScreen() {
       ${tile("#/inspections", m.photos, "Photos", "#0891b2", "📷")}
     </div>
     <div class="section-title">Quick add</div>
-    <div class="quick"><a href="#/tasks"><span>✅</span>Task</a><a href="#/inspections/new"><span>🔍</span>Inspection</a><a href="#/takeoff"><span>📐</span>Take-off</a></div>
+    <div class="quick"><a href="#/diary/new"><span>📒</span>Diary</a><a href="#/tasks"><span>✅</span>Task</a><a href="#/inspections/new"><span>🔍</span>Inspection</a><a href="#/takeoff"><span>📐</span>Take-off</a></div>
     ${m.perProject.length ? `<div class="section-title">Projects</div>${m.perProject.map((x) => {
       const total = x.open + x.done;
       return `<div class="card proj" style="--c:${x.color}"><b>${escapeHtml(x.project.displayNumber)}</b> <span class="muted">${escapeHtml(x.project.clientName || "")}</span>
