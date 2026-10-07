@@ -71,8 +71,8 @@ const T0 = new Date("2026-10-05T10:00:00Z");
   section("Start-up and navigation");
   {
     const a = await bootApp();
-    check(a.text("#main h2") === "Take-Off", "opens on Take-Off, the first thing needed on site");
-    check(a.$("#tabbar a.active").dataset.route === "takeoff", "the Take-Off tab is highlighted");
+    check(/^Good (morning|afternoon|evening)$/.test(a.text("#main .hero h2")), "opens on Home");
+    check(a.$("#tabbar a.active").dataset.route === "home", "the Home tab is highlighted");
     a.w.location.hash = "#/sync";
     await a.waitFor(() => a.text("#main h2") === "Sync", "the Sync screen");
     check(a.$("#tabbar a.active").dataset.route === "sync", "the Sync tab is highlighted");
@@ -80,9 +80,9 @@ const T0 = new Date("2026-10-05T10:00:00Z");
     await a.waitFor(() => a.text("#main h2") === "Device check", "the Device check screen");
     check(a.$("#tabbar a.active").dataset.route === "sync", "the Device check belongs to the Sync tab");
     a.w.location.hash = "#/nonsense";
-    await a.waitFor(() => a.text("#main h2") === "Take-Off", "fallback screen");
+    await a.waitFor(() => a.$("#main .hero"), "fallback screen");
     check(a.errors.length === 0, "no script errors: " + a.errors.join("; "));
-    console.log("Confirmed: opens on Take-Off; tabs, Device check and an unknown address all land on the right screen");
+    console.log("Confirmed: opens on Home; tabs, Device check and an unknown address all land on the right screen");
   }
   {
     const a = await bootApp({ hash: "#/sync" });
@@ -130,7 +130,7 @@ const T0 = new Date("2026-10-05T10:00:00Z");
     const a = await bootApp({ hash: "#/sync" });
     const deviceId = await a.w.fsp.sync.getDeviceId();
     check(/No project list yet/.test(a.text("#main")) && /Nothing to send yet/.test(a.text("#main")), "a fresh phone says there's nothing yet");
-    check(a.text("#main").includes(deviceId) && /App version 0\.5\.0/.test(a.text("#main")), "the device id and app version are shown");
+    check(a.text("#main").includes(deviceId) && /App version 0\.6\.0/.test(a.text("#main")), "the device id and app version are shown");
 
     check(!a.$("#syncImportInput").hasAttribute("accept") && a.$("#syncImportInput").multiple, "the import picker has NO file-type filter (Android hides files it doesn't recognise, and sync apps often deliver them untyped) and allows several files");
 

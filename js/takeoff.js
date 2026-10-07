@@ -129,7 +129,7 @@ async function renderTakeoffGroups() {
       const count = model.cards.filter((c) => c.data.groupId === g.id).length;
       const [kind, label] = model.conflicted.has(g.id) ? ["bad", "Needs decision"] : TO_BADGE[fsp.sync.recordState(g)];
       return `<a class="card link-card" href="#/takeoff/${escapeHtml(g.id)}">
-        <div class="row"><div class="grow"><b>${escapeHtml(g.data.name || "Untitled group")}</b>
+        <div class="row"><div class="ico" style="--c:#d97706">📁</div><div class="grow"><b>${escapeHtml(g.data.name || "Untitled group")}</b>
         <div class="sub">${escapeHtml(project ? toProjectLabel(project) : "Project not in your list")} · ${count} take-off${count === 1 ? "" : "s"}</div></div>
         <span class="badge ${kind}">${label}</span></div></a>`;
     }).join("") : `<div class="empty-state">No take-off groups${filter === "all" ? " yet" : " for this project"}.</div>`}`;
@@ -178,7 +178,7 @@ async function renderTakeoffGroup(groupId) {
       const [kind, label] = model.conflicted.has(c.id) ? ["bad", "Needs decision"] : TO_BADGE[fsp.sync.recordState(c)];
       const n = toCountItems(c.data.lineItems);
       return `<a class="card link-card" href="#/takeoff/${escapeHtml(groupId)}/${escapeHtml(c.id)}">
-        <div class="row"><div class="grow"><b>${escapeHtml(c.data.title || "Untitled")}</b>
+        <div class="row"><div class="ico" style="--c:#d97706">📐</div><div class="grow"><b>${escapeHtml(c.data.title || "Untitled")}</b>
         <div class="sub">${n} item${n === 1 ? "" : "s"}${c.data.date ? " · " + escapeHtml(c.data.date) : ""}${c.data.notes ? " · " + escapeHtml(c.data.notes.slice(0, 60)) : ""}</div></div>
         <span class="badge ${kind}">${label}</span></div></a>`;
     }).join("") : `<div class="empty-state">No take-offs in this group yet.</div>`}`;

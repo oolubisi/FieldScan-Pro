@@ -39,7 +39,7 @@ function inRow(m, r) {
   const [kind, label] = m.conflicted.has(r.id) ? ["bad", "Needs decision"] : TO_BADGE[fsp.sync.recordState(r)];
   const sub = [r.data.inspectionDate || "", p ? p.displayNumber : "", r.data.location || ""].filter(Boolean).join(" · ");
   return `<a class="row link-row" href="#/inspections/${escapeHtml(r.id)}" style="color:inherit;text-decoration:none;">
-    <div class="grow"><b>${escapeHtml(r.data.title || "Untitled inspection")}</b>${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ""}</div>
+    <div class="ico" style="--c:#7c3aed">🔍</div><div class="grow"><b>${escapeHtml(r.data.title || "Untitled inspection")}</b>${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ""}</div>
     <span class="badge ${kind}">${label}</span></a>`;
 }
 

@@ -1,11 +1,12 @@
 // ===== App shell: boot, routing, and the Sync screen =====
 
-const APP_VERSION = "0.5.0 (Photos)";
+const APP_VERSION = "0.6.0 (Photo viewer + editor)";
 const fsp = { db: null, sync: null, storageError: null };
 window.APP_VERSION = APP_VERSION;
 window.fsp = fsp;
 
 const ROUTES = {
+  home: { tab: "home", render: () => renderHomeScreen() },
   takeoff: { tab: "takeoff", render: () => renderTakeoffScreen() },
   tasks: { tab: "tasks", render: () => renderTasksScreen() },
   inspections: { tab: "inspections", render: () => renderInspectionsScreen() },
@@ -17,7 +18,7 @@ const ROUTES = {
 
 function currentRoute() {
   const m = /^#\/([a-z-]+)/.exec(location.hash);
-  return m && ROUTES[m[1]] ? m[1] : "takeoff";
+  return m && ROUTES[m[1]] ? m[1] : "home";
 }
 
 function navigate() {
@@ -48,7 +49,27 @@ async function requestPersistentStorage() {
   } catch (e) { /* best effort; the device check reports the outcome */ }
 }
 
+/** Auto (follows the phone) -> Light -> Dark. Remembered on this phone. */
+function setupTheme() {
+  const btn = document.getElementById("themeBtn");
+  if (!btn) return;
+  const get = () => { try { return localStorage.getItem("fsp-theme") || "auto"; } catch (e) { return "auto"; } };
+  const apply = (t) => {
+    if (t === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
+    btn.textContent = t === "auto" ? "Auto" : t === "light" ? "Light" : "Dark";
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", t === "light" ? "#1a2332" : "#0a0f16");
+  };
+  apply(get());
+  btn.onclick = () => {
+    const next = { auto: "light", light: "dark", dark: "auto" }[get()];
+    try { localStorage.setItem("fsp-theme", next); } catch (e) { /* not saved */ }
+    apply(next);
+  };
+}
+
 async function boot() {
+  setupTheme();
   registerServiceWorker();
   try {
     fsp.db = await FSPDb.open();

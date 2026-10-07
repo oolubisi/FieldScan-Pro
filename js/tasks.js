@@ -42,7 +42,7 @@ function tsRow(m, t) {
   const g = t.data.groupId ? m.groups.find((x) => x.id === t.data.groupId) : null;
   const [kind, label] = m.conflicted.has(t.id) ? ["bad", "Needs decision"] : TO_BADGE[fsp.sync.recordState(t)];
   const sub = [p ? p.displayNumber : "", g ? g.data.name : ""].filter(Boolean).join(" · ");
-  return `<div class="row task-row" data-id="${escapeHtml(t.id)}">
+  return `<div class="row task-row" data-id="${escapeHtml(t.id)}" style="${p ? `--c:${hmColor(p.key || p.id)}` : ""}">
     <button class="btn ${done ? "" : "secondary"} small ts-toggle" type="button" aria-label="${done ? "Reopen" : "Mark done"}" ${m.conflicted.has(t.id) ? "disabled" : ""}>${done ? "✓" : "○"}</button>
     <a class="grow ts-open" href="#/tasks/${escapeHtml(t.id)}" style="color:inherit;text-decoration:none;">
       <b style="${done ? "text-decoration:line-through;" : ""}">${escapeHtml(t.data.title || "Untitled")}</b>
