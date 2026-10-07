@@ -1,12 +1,13 @@
 // ===== App shell: boot, routing, and the Sync screen =====
 
-const APP_VERSION = "0.2.0 (Take-Off)";
+const APP_VERSION = "0.3.0 (Tasks)";
 const fsp = { db: null, sync: null, storageError: null };
 window.APP_VERSION = APP_VERSION;
 window.fsp = fsp;
 
 const ROUTES = {
   takeoff: { tab: "takeoff", render: () => renderTakeoffScreen() },
+  tasks: { tab: "tasks", render: () => renderTasksScreen() },
   conflicts: { tab: "takeoff", render: () => renderConflictsScreen() },
   calculators: { tab: "calculators", render: () => renderCalculatorsSection() },
   sync: { tab: "sync", render: () => renderSyncScreen() },

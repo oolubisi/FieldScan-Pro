@@ -98,11 +98,13 @@
       return rec;
     }
 
-    async function saveRecord(id, data) {
+    /** meta.projectId (optional) moves the record to another project, or to none with "". */
+    async function saveRecord(id, data, meta) {
       const deviceId = await getDeviceId();
       return db.readModifyWrite([{ store: "records", key: id }], ([rec]) => {
         if (!rec) throw new Error("No such record: " + id);
-        const next = { ...rec, data, vv: P.vvBump(rec.vv, deviceId), updatedAt: clock().toISOString(), origin: deviceId, deleted: false };
+        const projectId = meta && meta.projectId !== undefined ? meta.projectId || null : rec.projectId;
+        const next = { ...rec, projectId, data, vv: P.vvBump(rec.vv, deviceId), updatedAt: clock().toISOString(), origin: deviceId, deleted: false };
         return { ops: [{ op: "put", store: "records", value: next }], result: next };
       });
     }

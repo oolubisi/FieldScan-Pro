@@ -65,6 +65,8 @@ function toDescribe(type, snap) {
     if (d.notes) lines.push(`Notes: ${d.notes}`);
     return lines;
   }
+  if (type === "task-group") return [`Task group: ${d.name || "(no name)"}`];
+  if (type === "task") return [`Task: ${d.title || "(no title)"}`, `Status: ${d.status || "Open"}`].concat(d.notes ? [`Notes: ${d.notes}`] : []);
   return Object.keys(d).slice(0, 8).map((k) => `${k}: ${typeof d[k] === "object" ? "…" : String(d[k])}`);
 }
 

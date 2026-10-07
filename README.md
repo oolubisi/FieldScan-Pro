@@ -100,3 +100,7 @@ If Chrome asks for permission after the app was closed, tap Allow. The manual im
 - Records sent to the desktop show *Not sent* → *Sent* → *Delivered ✓*. *Delivered* appears only when the desktop's receipt arrives.
 - **Decisions**: if the same record is edited on both the phone and the desktop before they sync, nothing is overwritten. A banner appears; open it to see both versions side by side and keep one. The choice goes to the other side on the next sync.
 - Fields the desktop adds to a record that the phone doesn't show are kept when the phone edits it.
+
+## Tasks
+
+Open the **Tasks** tab. Type a task and tap Add (separate several with `;`). Tap the circle to mark done; tap a task to edit its notes, project, group or delete it. With several companies, pick the company first. Groups are created and renamed on the desktop; the phone can assign a task to an existing group. Tasks sync both ways with the desktop's **Tasks** section; if both sides edit the same task, the Sync tab shows a decision screen ("Keep the phone's / Keep the desktop's").
