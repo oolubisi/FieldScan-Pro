@@ -1,6 +1,6 @@
 // ===== App shell: boot, routing, and the Sync screen =====
 
-const APP_VERSION = "0.7.1 (Help)";
+const APP_VERSION = "0.8.0 (Projects)";
 const fsp = { db: null, sync: null, storageError: null };
 window.APP_VERSION = APP_VERSION;
 window.fsp = fsp;
@@ -8,6 +8,7 @@ window.fsp = fsp;
 const ROUTES = {
   diary: { tab: "home", render: () => renderDiaryScreen() },
   search: { tab: "home", render: () => renderSearchScreen() },
+  projects: { tab: "projects", render: () => renderProjectsScreen() },
   home: { tab: "home", render: () => renderHomeScreen() },
   takeoff: { tab: "takeoff", render: () => renderTakeoffScreen() },
   tasks: { tab: "tasks", render: () => renderTasksScreen() },

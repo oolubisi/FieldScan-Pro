@@ -139,14 +139,15 @@ async function phOpenViewer(parent, label, startIndex, onClose) {
   draw();
 }
 
-async function phMount(box, parent, label) {
+async function phMount(box, parent, label, opts) {
   if (!box) return;
+  const stages = opts && opts.stages ? ((await fsp.sync.getRecords(parent.type)).find((r) => r.id === parent.id) || parent).data.photoStages || {} : null;
   const photos = (await fsp.sync.getRecords("photo")).filter((r) => r.data.parentId === parent.id)
     .sort((a, b) => String(a.data.takenAt || "").localeCompare(String(b.data.takenAt || "")));
   box.innerHTML = `<h3>Photos${photos.length ? ` (${photos.length})` : ""}</h3>
     <div class="ph-grid">${photos.map((p) => `<div class="ph-item" data-id="${escapeHtml(p.id)}">
       <img src="data:${escapeHtml(p.data.mime)};base64,${p.data.b64}" alt="Photo">
-      <input type="checkbox" class="ph-pick" aria-label="Select photo">
+      <input type="checkbox" class="ph-pick" aria-label="Select photo">${stages ? `<select class="ph-stage" aria-label="Stage"><option value="">No stage</option>${["Before", "During", "After"].map((s) => `<option value="${s}" ${stages[p.id] === s ? "selected" : ""}>${s}</option>`).join("")}</select>` : ""}
       <button type="button" class="ph-del" aria-label="Remove photo">×</button>${p.data.caption ? `<div class="ph-cap">${escapeHtml(p.data.caption)}</div>` : ""}</div>`).join("")}</div>
     ${photos.length ? `<p class="muted" style="font-size:12px; margin:0 0 8px;">Tap a photo to view, rotate or delete it.</p>` : ""}
     <label class="btn secondary block ph-add">Add photo<input type="file" class="ph-file" accept="image/*" capture="environment" multiple hidden></label>
@@ -164,8 +165,11 @@ async function phMount(box, parent, label) {
         });
       } catch (e) { return fail(e.message || String(e)); }
     }
-    await phMount(box, parent, label);
+    await phMount(box, parent, label, opts);
   };
+  box.querySelectorAll(".ph-stage").forEach((sel) => {
+    sel.onchange = () => pjSetStage(parent.id, sel.closest(".ph-item").dataset.id, sel.value);
+  });
   const all = box.querySelector(".ph-all");
   if (all) all.onchange = () => box.querySelectorAll(".ph-pick").forEach((c) => { c.checked = all.checked; });
   const save = box.querySelector(".ph-save");
@@ -177,9 +181,9 @@ async function phMount(box, parent, label) {
     box.querySelector(".ph-result").innerHTML = resultBox([`${items.length} photo${items.length === 1 ? "" : "s"} saved to this phone's Downloads.`]);
   };
   box.querySelectorAll(".ph-item img").forEach((img) => {
-    img.onclick = () => phOpenViewer(parent, label, photos.findIndex((p) => p.id === img.closest(".ph-item").dataset.id), () => phMount(box, parent, label));
+    img.onclick = () => phOpenViewer(parent, label, photos.findIndex((p) => p.id === img.closest(".ph-item").dataset.id), () => phMount(box, parent, label, opts));
   });
   box.querySelectorAll(".ph-del").forEach((b) => {
-    b.onclick = async () => { await fsp.sync.deleteRecord(b.closest(".ph-item").dataset.id); await phMount(box, parent, label); };
+    b.onclick = async () => { await fsp.sync.deleteRecord(b.closest(".ph-item").dataset.id); await phMount(box, parent, label, opts); };
   });
 }
