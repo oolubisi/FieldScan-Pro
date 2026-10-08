@@ -218,3 +218,9 @@ a.link-card .row { align-items: center; }
 .pj-tabs a { flex: none; padding: 8px 12px; border-radius: 16px; background: var(--card); color: var(--sub); text-decoration: none; font-size: 13px; font-weight: 600; box-shadow: var(--shadow); }
 .pj-tabs a.active { background: var(--accent); color: #fff; }
 .ph-stage { position: absolute; left: 4px; bottom: 4px; max-width: 90%; font-size: 11px; padding: 2px; }
+
+/* ---- Company switch (header) ---- */
+#coSwitch { max-width: 38vw; margin-left: auto; margin-right: 8px; background: rgba(255,255,255,0.14); color: #fff; border: 0; border-radius: 16px; padding: 6px 8px; font-size: 13px; font-weight: 600; }
+#coSwitch option { color: #000; }
+#coSwitch[hidden] { display: none; }
+#coSwitch + #searchBtn { margin-left: 0; }

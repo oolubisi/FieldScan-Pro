@@ -8,10 +8,10 @@ const INSP = "inspection";
 
 async function inLoad() {
   const status = await fsp.sync.getStatus();
-  const projects = await fsp.sync.listProjects();
-  const items = await fsp.sync.getRecords(INSP);
+  const projects = coFilter(await fsp.sync.listProjects());
+  const items = coFilter(await fsp.sync.getRecords(INSP));
   const conflicts = await fsp.sync.getConflicts();
-  const companies = Object.keys(status.projectsMeta).map((k) => ({ key: k, name: status.projectsMeta[k].name }));
+  const companies = coCompanies(Object.keys(status.projectsMeta).map((k) => ({ key: k, name: status.projectsMeta[k].name })));
   return { projects, items, companies, conflicts, conflicted: new Set(conflicts.map((c) => c.id)) };
 }
 

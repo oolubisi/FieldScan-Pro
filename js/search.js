@@ -30,9 +30,9 @@ const SR_KINDS = {
 };
 
 async function srLoad() {
-  const projects = await fsp.sync.listProjects();
+  const projects = coFilter(await fsp.sync.listProjects());
   const recs = [];
-  for (const t of Object.keys(SR_KINDS)) recs.push(...(await fsp.sync.getRecords(t)));
+  for (const t of Object.keys(SR_KINDS)) recs.push(...coFilter(await fsp.sync.getRecords(t)));
   return { projects, recs };
 }
 

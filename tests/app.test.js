@@ -130,7 +130,7 @@ const T0 = new Date("2026-10-05T10:00:00Z");
     const a = await bootApp({ hash: "#/sync" });
     const deviceId = await a.w.fsp.sync.getDeviceId();
     check(/No project list yet/.test(a.text("#main")) && /Nothing to send yet/.test(a.text("#main")), "a fresh phone says there's nothing yet");
-    check(a.text("#main").includes(deviceId) && /App version 0\.8\.0/.test(a.text("#main")), "the device id and app version are shown");
+    check(a.text("#main").includes(deviceId) && /App version 0\.8\.1/.test(a.text("#main")), "the device id and app version are shown");
 
     check(!a.$("#syncImportInput").hasAttribute("accept") && a.$("#syncImportInput").multiple, "the import picker has NO file-type filter (Android hides files it doesn't recognise, and sync apps often deliver them untyped) and allows several files");
 

@@ -10,11 +10,11 @@ const TASK_GROUP = "task-group";
 
 async function tsLoad() {
   const status = await fsp.sync.getStatus();
-  const projects = await fsp.sync.listProjects();
-  const groups = await fsp.sync.getRecords(TASK_GROUP);
-  const tasks = await fsp.sync.getRecords(TASK);
+  const projects = coFilter(await fsp.sync.listProjects());
+  const groups = coFilter(await fsp.sync.getRecords(TASK_GROUP));
+  const tasks = coFilter(await fsp.sync.getRecords(TASK));
   const conflicts = await fsp.sync.getConflicts();
-  const companies = Object.keys(status.projectsMeta).map((k) => ({ key: k, name: status.projectsMeta[k].name }));
+  const companies = coCompanies(Object.keys(status.projectsMeta).map((k) => ({ key: k, name: status.projectsMeta[k].name })));
   return { projects, groups, tasks, companies, conflicts, conflicted: new Set(conflicts.map((c) => c.id)) };
 }
 

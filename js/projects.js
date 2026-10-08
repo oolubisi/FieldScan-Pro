@@ -30,7 +30,7 @@ async function pjSetStage(parentId, photoId, stage) {
 }
 
 async function pjLoad() {
-  const projects = await fsp.sync.listProjects();
+  const projects = coFilter(await fsp.sync.listProjects());
   const conflicts = await fsp.sync.getConflicts();
   return { projects, conflicts };
 }
@@ -46,7 +46,7 @@ async function renderProjectList() {
   const main = document.getElementById("main");
   const m = await pjLoad();
   const counts = {};
-  for (const type of ["progress", "snag"]) for (const r of await fsp.sync.getRecords(type)) {
+  for (const type of ["progress", "snag"]) for (const r of coFilter(await fsp.sync.getRecords(type))) {
     const k = `${r.companyKey}:${r.projectId}`; counts[k] = counts[k] || { progress: 0, snag: 0 }; counts[k][type]++;
   }
   main.innerHTML = `<h2>Projects</h2>${toBanner(m)}

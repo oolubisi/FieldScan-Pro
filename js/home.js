@@ -31,8 +31,8 @@ function hmAgo(iso, now) {
 async function hmLoad(now) {
   const n = now || new Date();
   const status = await fsp.sync.getStatus();
-  const projects = await fsp.sync.listProjects();
-  const [tasks, inspections, cards, photos] = await Promise.all(["task", "inspection", "takeoff", "photo"].map((t) => fsp.sync.getRecords(t)));
+  const projects = coFilter(await fsp.sync.listProjects());
+  const [tasks, inspections, cards, photos] = await Promise.all(["task", "inspection", "takeoff", "photo"].map(async (t) => coFilter(await fsp.sync.getRecords(t))));
   const month = n.toISOString().slice(0, 7);
   const open = tasks.filter((t) => t.data.status !== "Done");
   const overdue = open.filter((t) => tsDueStatus(t.data.dueDate) === "overdue").length;

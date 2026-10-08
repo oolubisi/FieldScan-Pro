@@ -53,3 +53,15 @@ function formatWhen(iso) {
   if (isNaN(d.getTime())) return "";
   return d.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
+
+
+// ---------- Company view ----------
+// With more than one company on the phone, the header switch picks which one every screen shows.
+// "" means all companies. Remembered on this phone; a company that is no longer known counts as "all".
+const CO_STORE = "fsp-company";
+function coCurrent() { try { return localStorage.getItem(CO_STORE) || ""; } catch (e) { return ""; } }
+function coSet(key) { try { if (key) localStorage.setItem(CO_STORE, key); else localStorage.removeItem(CO_STORE); } catch (e) { /* not saved */ } }
+/** Keeps only the current company's projects or records. */
+function coFilter(list) { const c = coCurrent(); return c ? list.filter((x) => x.companyKey === c) : list; }
+/** The companies the forms may offer: just the current one when a company is chosen. */
+function coCompanies(list) { const c = coCurrent(); return c ? list.filter((x) => x.key === c) : list; }

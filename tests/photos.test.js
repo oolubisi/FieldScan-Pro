@@ -89,6 +89,7 @@ const photoIs = (a) => a.$$(".ph-item");
   await go(a, "#/calculators", "Calculators");
   await go(a, "#/tasks/" + task.id, "Edit task");
   check(/Photos/.test(a.text("#tsPhotos")) && photoIs(a).length === 0, "photo section on the task");
+  await a.waitFor(() => a.$(".ph-file"), "the photo section");
   a.setFiles(a.$(".ph-file"), [{ name: "a.jpg" }, { name: "b.jpg" }]);
   await a.waitFor(() => photoIs(a).length === 2, "two photos");
   let ph = await a.w.fsp.sync.getRecords("photo");
@@ -111,6 +112,7 @@ const photoIs = (a) => a.$$(".ph-item");
   check((await a.w.fsp.sync.getRecords("photo")).length === 1, "removed from the store");
 
   // viewer: tap a picture, rotate, next/prev, delete
+  await a.waitFor(() => a.$(".ph-file"), "the photo section");
   a.setFiles(a.$(".ph-file"), [{ name: "e.jpg" }]);
   await a.waitFor(() => photoIs(a).length === 2, "second photo back");
   const ROT = Buffer.from("rotated").toString("base64");
@@ -147,6 +149,7 @@ const photoIs = (a) => a.$$(".ph-item");
   check(/Save the inspection first/.test(a.text("#main")) && !a.$("#inPhotos"), "new inspection: save first");
   const insp = await a.w.fsp.sync.createRecord({ type: "inspection", data: { title: "Site" }, companyKey: CO });
   await go(a, "#/inspections/" + insp.id, "Edit inspection");
+  await a.waitFor(() => a.$(".ph-file"), "the photo section");
   a.setFiles(a.$(".ph-file"), [{ name: "c.jpg" }]);
   await a.waitFor(() => photoIs(a).length === 1, "inspection photo");
 
@@ -154,6 +157,7 @@ const photoIs = (a) => a.$$(".ph-item");
   const grp = await a.w.fsp.sync.createRecord({ type: "takeoff-group", data: { name: "G" }, companyKey: CO, projectId: "p1" });
   const card = await a.w.fsp.sync.createRecord({ type: "takeoff", data: { groupId: grp.id, title: "Tiling", date: "2026-10-01", notes: "", lineItems: [] }, companyKey: CO, projectId: "p1" });
   await go(a, "#/takeoff/" + grp.id + "/" + card.id, "Edit take-off");
+  await a.waitFor(() => a.$(".ph-file"), "the photo section");
   a.setFiles(a.$(".ph-file"), [{ name: "d.jpg" }]);
   await a.waitFor(() => photoIs(a).length === 1, "take-off photo");
 

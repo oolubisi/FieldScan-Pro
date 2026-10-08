@@ -75,9 +75,9 @@ function toDescribe(type, snap) {
 // ---------- loading ----------
 
 async function toLoad() {
-  const projects = await fsp.sync.listProjects();
-  const groups = await fsp.sync.getRecords(TO_GROUP);
-  const cards = await fsp.sync.getRecords(TO_CARD);
+  const projects = coFilter(await fsp.sync.listProjects());
+  const groups = coFilter(await fsp.sync.getRecords(TO_GROUP));
+  const cards = coFilter(await fsp.sync.getRecords(TO_CARD));
   const conflicts = await fsp.sync.getConflicts();
   const conflicted = new Set(conflicts.map((c) => c.id));
   return { projects, groups, cards, conflicts, conflicted };

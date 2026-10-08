@@ -7,10 +7,10 @@ const DY_WEATHER = ["Sunny", "Cloudy", "Light rain", "Heavy rain", "Windy", "Hot
 
 async function dyLoad() {
   const status = await fsp.sync.getStatus();
-  const projects = await fsp.sync.listProjects();
-  const items = await fsp.sync.getRecords(DIARY);
+  const projects = coFilter(await fsp.sync.listProjects());
+  const items = coFilter(await fsp.sync.getRecords(DIARY));
   const conflicts = await fsp.sync.getConflicts();
-  const companies = Object.keys(status.projectsMeta).map((k) => ({ key: k, name: status.projectsMeta[k].name }));
+  const companies = coCompanies(Object.keys(status.projectsMeta).map((k) => ({ key: k, name: status.projectsMeta[k].name })));
   return { projects, items, companies, conflicts, conflicted: new Set(conflicts.map((c) => c.id)) };
 }
 
