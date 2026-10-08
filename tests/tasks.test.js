@@ -170,13 +170,14 @@ const titles = (a) => rows(a).map((r) => r.querySelector("b").textContent);
         envelope({ id: "t2", data: { title: "Loose task", notes: "", status: "Open", groupId: "", sortOrder: 1 } }),
       ] }))]);
     await go(a, "#/calculators", "Calculators"); await go(a, "#/tasks", "Tasks");
-    check(!!a.$("#tsCompany") && a.$$("#tsCompany option").length === 2, "with two companies you choose which one a new task is for");
+    check(!a.$("#tsCompany") && !a.$("#coSwitch").hidden && a.$$("#coSwitch option").length === 2 && a.$("#coSwitch").value === CO, "with two companies the header switch picks one; no picker on the screen, starts on the first");
     check(!a.$("#main img") && /<img src=x/.test(a.text("#main")) && !a.$("#main h3 b"), "text from the desktop is shown as text");
     check(/Site <b>visit<\/b>/.test(a.text("#main h3")), "the group heading is shown");
     check(a.$$(".card").some((c) => c.querySelector("h3") && /Site/.test(c.querySelector("h3").textContent) && /Check rebar/.test(c.textContent)), "the grouped task sits under its group");
-    a.$("#tsCompany").value = "co-bbbb2222"; a.event(a.$("#tsCompany"), "change");
+    a.$("#coSwitch").value = "co-bbbb2222"; a.event(a.$("#coSwitch"), "change");
+    await a.waitFor(() => rows(a).length === 0, "Rivotel has no tasks yet");
     a.setValue(a.$("#tsNew"), "For Rivotel"); a.$("#tsAdd").click();
-    await a.waitFor(() => rows(a).length === 3, "added");
+    await a.waitFor(() => rows(a).length === 1, "added");
     check((await a.w.fsp.sync.getRecords("task")).find((r) => r.data.title === "For Rivotel").companyKey === "co-bbbb2222", "filed under the chosen company");
 
     // edit offers only that company's projects and groups
@@ -185,6 +186,8 @@ const titles = (a) => rows(a).map((r) => r.querySelector("b").textContent);
     await a.waitFor(() => a.text("#main h2") === "Edit task", "edit");
     check(a.$$("#tsProject option").length === 2 && a.$$("#tsGroup option").length === 1, "only that company's projects, and none of the other company's groups");
 
+    // back to the first company for the conflict part
+    a.w.localStorage.setItem("fsp-company", CO);
     // conflict
     const base = (await a.w.fsp.sync.getRecords("task")).find((r) => r.id === "t2");
     await a.w.fsp.sync.saveRecord("t2", { ...base.data, title: "Loose (phone)" });
@@ -201,7 +204,7 @@ const titles = (a) => rows(a).map((r) => r.querySelector("b").textContent);
     await a.waitFor(() => /Nothing to decide/.test(a.text("#main")), "resolved");
     check((await a.w.fsp.db.get("records", "t2")).data.title === "Loose (desktop)", "desktop's version kept");
     check(a.errors.length === 0, "no script errors: " + a.errors.join("; "));
-    console.log("Confirmed: groups, company chooser, scoped edit lists, escaping, conflict handling");
+    console.log("Confirmed: groups, company switch, scoped edit lists, escaping, conflict handling");
   }
 
   console.log("\n✅ ALL TASKS SCREEN TESTS PASSED");

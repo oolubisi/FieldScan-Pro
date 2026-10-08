@@ -1,6 +1,6 @@
 // ===== App shell: boot, routing, and the Sync screen =====
 
-const APP_VERSION = "0.8.1 (Companies)";
+const APP_VERSION = "0.8.2 (Companies)";
 const fsp = { db: null, sync: null, storageError: null };
 window.APP_VERSION = APP_VERSION;
 window.fsp = fsp;
@@ -29,26 +29,25 @@ function currentRoute() {
   return m && ROUTES[m[1]] ? m[1] : "home";
 }
 
-/** The company switch in the header: shown only when the phone holds more than one company. */
+/** The company switch in the header: one company at a time. Shown only when the phone holds more than one. */
 async function renderCompanySwitch() {
   const sel = document.getElementById("coSwitch");
   if (!sel || !fsp.sync) return;
   const meta = (await fsp.sync.getStatus()).projectsMeta || {};
   const keys = Object.keys(meta);
-  if (coCurrent() && !keys.includes(coCurrent())) coSet("");
+  if (!keys.includes(coCurrent())) coSet(keys[0] || ""); // first company until one is chosen
   sel.hidden = keys.length < 2;
-  if (keys.length < 2) { coSet(""); return; }
-  sel.innerHTML = `<option value="">All companies</option>` + keys.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(meta[k].name || "Company")}</option>`).join("");
+  if (keys.length < 2) return;
+  sel.innerHTML = keys.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(meta[k].name || "Company")}</option>`).join("");
   sel.value = coCurrent();
   sel.onchange = () => { coSet(sel.value); navigate(); };
 }
 
 function navigate() {
   const name = currentRoute();
-  renderCompanySwitch().catch(() => {});
   document.querySelectorAll("#tabbar a").forEach((a) => a.classList.toggle("active", a.dataset.route === ROUTES[name].tab));
   document.getElementById("main").scrollTop = 0;
-  Promise.resolve(ROUTES[name].render()).catch((e) => {
+  Promise.resolve(renderCompanySwitch()).catch(() => {}).then(() => ROUTES[name].render()).catch((e) => {
     document.getElementById("main").innerHTML = `<div class="card"><h3>Something went wrong</h3><p class="muted">${escapeHtml(e.message || e)}</p></div>`;
   });
 }

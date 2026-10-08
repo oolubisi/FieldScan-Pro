@@ -1,5 +1,5 @@
 // Run: node tests/companies.test.js
-// Company switch: with two companies on the phone, every screen shows one company at a time.
+// Company switch: with two companies on the phone, every screen shows one company at a time (no "all" view).
 const fs = require("fs");
 const path = require("path");
 const { JSDOM } = require("jsdom");
@@ -89,12 +89,12 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
   await a.w.fsp.sync.createRecord({ type: "snag", companyKey: CO2, projectId: "r1", data: { title: "Rivotel snag", status: "Open" } });
   await go(a, "#/calculators", "Calculators"); await go(a, "#/projects", "Projects");
   await a.waitFor(() => !sw().hidden, "switch appears with two companies");
-  check([...sw().options].map((o) => o.textContent).join("|") === "All companies|PI Projects|Rivotel", "options: " + [...sw().options].map((o) => o.textContent));
-  check(a.$$("a.link-card").length === 2, "All companies shows both projects");
+  check([...sw().options].map((o) => o.textContent).join("|") === "PI Projects|Rivotel", "options, no All: " + [...sw().options].map((o) => o.textContent));
+  check(sw().value === CO && a.$$("a.link-card").length === 1 && /Client p1/.test(a.text("#main")), "starts on the first company, showing only its project");
 
   sw().value = CO2; a.event(sw(), "change");
-  await a.waitFor(() => a.$$("a.link-card").length === 1, "one project after choosing Rivotel");
-  check(/Rivotel/.test(a.text("#main")) && /1 snag/.test(a.text("#main")), "Rivotel project with its own snag: " + a.text("#main"));
+  await a.waitFor(() => /Client r1/.test(a.text("#main")), "Rivotel project after choosing Rivotel");
+  check(/Client r1/.test(a.text("#main")) && a.$$("a.link-card").length === 1 && /1 snag/.test(a.text("#main")), "Rivotel project with its own snag: " + a.text("#main"));
 
   await go(a, "#/tasks", "Tasks");
   await a.waitFor(() => a.$$(".task-row").length === 1, "tasks filtered");
@@ -110,9 +110,10 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
   await a.waitFor(() => /PI task/.test(a.text("#main")), "switch to PI Projects");
   check(!/Rivotel task/.test(a.text("#main")), "no Rivotel task");
 
-  sw().value = ""; a.event(sw(), "change");
-  await a.waitFor(() => a.$$(".task-row").length === 2, "all companies shows both again");
-  check(a.w.localStorage.getItem("fsp-company") === null, "cleared");
+  check(a.w.localStorage.getItem("fsp-company") === CO, "choice saved");
+  a.w.localStorage.setItem("fsp-company", "co-gone");
+  await go(a, "#/inspections", "Inspections"); await go(a, "#/tasks", "Tasks");
+  check(sw().value === CO && /PI task/.test(a.text("#main")), "an unknown saved company falls back to the first");
   check(a.errors.length === 0, "no page errors: " + a.errors);
   console.log("\n✅ ALL COMPANY SWITCH TESTS PASSED");
   process.exit(0);

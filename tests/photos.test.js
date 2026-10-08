@@ -88,6 +88,7 @@ const photoIs = (a) => a.$$(".ph-item");
   const task = await a.w.fsp.sync.createRecord({ type: "task", data: { title: "Order", notes: "", status: "Open", groupId: "", sortOrder: 1 }, companyKey: CO, projectId: "p1" });
   await go(a, "#/calculators", "Calculators");
   await go(a, "#/tasks/" + task.id, "Edit task");
+  await a.waitFor(() => /Photos/.test(a.text("#tsPhotos")), "the photo section");
   check(/Photos/.test(a.text("#tsPhotos")) && photoIs(a).length === 0, "photo section on the task");
   await a.waitFor(() => a.$(".ph-file"), "the photo section");
   a.setFiles(a.$(".ph-file"), [{ name: "a.jpg" }, { name: "b.jpg" }]);

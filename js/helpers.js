@@ -57,7 +57,7 @@ function formatWhen(iso) {
 
 // ---------- Company view ----------
 // With more than one company on the phone, the header switch picks which one every screen shows.
-// "" means all companies. Remembered on this phone; a company that is no longer known counts as "all".
+// Always exactly one company (the first, until another is chosen). Remembered on this phone.
 const CO_STORE = "fsp-company";
 function coCurrent() { try { return localStorage.getItem(CO_STORE) || ""; } catch (e) { return ""; } }
 function coSet(key) { try { if (key) localStorage.setItem(CO_STORE, key); else localStorage.removeItem(CO_STORE); } catch (e) { /* not saved */ } }
