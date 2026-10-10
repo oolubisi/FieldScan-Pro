@@ -154,6 +154,32 @@
       return pruned;
     }
 
+    /**
+     * Keeps only the newest KEEP_VERSIONS bundle files (and test-ping files) per device in the folder.
+     * This phone's own files are always eligible (a record nobody confirmed is simply sent again in a newer
+     * file); the desktop's files only once they have been read here (`readable`).
+     */
+    const KEEP_VERSIONS = 5;
+    async function pruneVersions(handle, files, deviceId, readable) {
+      const groups = new Map();
+      for (const { name } of files) {
+        const m = /^fsp-(bundle|probe)-(.+?)-\d{8}-\d{6}/.exec(name);
+        if (!m) continue;
+        if (m[2] !== deviceId && !readable.has(name)) continue;
+        const key = m[1] + ":" + m[2];
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(name);
+      }
+      let removed = 0;
+      for (const names of groups.values()) {
+        names.sort();
+        for (const n of names.slice(0, Math.max(0, names.length - KEEP_VERSIONS))) {
+          try { await handle.removeEntry(n); removed++; } catch (e) { /* in use or already gone */ }
+        }
+      }
+      return removed;
+    }
+
     async function runSync(opts) {
       const auto = !!(opts && opts.auto); // a timer run: there is no tap to ask permission with, so it must not ask
       const handle = await store.get().catch(() => null);
@@ -240,6 +266,9 @@
       // 4: tidy.
       try {
         out.pruned = await pruneOwnFiles(handle, own, wroteName);
+        const readable = new Set(files.filter((f) => meta.processed[f.name] !== undefined).map((f) => f.name));
+        const now2 = wroteName ? files.concat([{ name: wroteName }]) : files;
+        out.pruned += await pruneVersions(handle, now2, deviceId, readable);
         const live = new Set(files.map((f) => f.name));
         if (wroteName) live.add(wroteName);
         Object.keys(meta.processed).forEach((n) => { if (!live.has(n)) delete meta.processed[n]; });

@@ -136,6 +136,27 @@ const bundleFiles = (folder, dev) => [...folder.files.keys()].filter((n) => n.in
     console.log("Confirmed: delivered only on receipt; own confirmed files pruned; waiting files not duplicated");
   }
 
+  section("Only the last 5 versions are kept");
+  {
+    const folder = fakeFolder();
+    const a = await fresh(folder);
+    const dev = await a.sync.getDeviceId();
+    const stampN = (n) => `202610${String(10 + n).padStart(2, "0")}-100000`;
+    for (let n = 0; n < 8; n++) {
+      folder.put(`fsp-bundle-${DT}-${stampN(n)}-d${n}.json`, desktopBundle([env({ id: "d-" + n })]));
+      folder.put(`fsp-bundle-${dev}-${stampN(n)}-p${n}.json`, P.makeBundle({ origin: dev, envelopes: [], acks: [], now: new Date(T0) }));
+    }
+    folder.put("fsp-bundle-dt-cccccc-20261001-100000-zz.json", desktopBundle([env({ id: "other", origin: "dt-cccccc" })]));
+    const r = await a.fs.syncNow();
+    const desk = [...folder.files.keys()].filter((n) => n.indexOf("fsp-bundle-" + DT) === 0).sort();
+    check(r.ok && desk.length === 5 && desk[0].includes(stampN(3)) && desk[4].includes(stampN(7)), "the desktop's files, once read, are cut to the newest 5: " + desk.length);
+    const mine = [...folder.files.keys()].filter((n) => n.indexOf("fsp-bundle-" + dev) === 0);
+    check(mine.length <= 5, "this phone's own files are cut to 5: " + mine.length);
+    check(folder.files.has("fsp-bundle-dt-cccccc-20261001-100000-zz.json"), "another device's single file is untouched");
+    check(a.sync.recordState && (await a.db.get("records", "d-0")) !== undefined, "everything in the removed files was already applied first");
+    console.log("Confirmed: the newest 5 versions per device are kept; older ones are deleted after being read");
+  }
+
   section("Receipt-only files are not thrown away early");
   {
     const folder = fakeFolder();
