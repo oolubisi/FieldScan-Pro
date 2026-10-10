@@ -32,7 +32,7 @@ async function hmLoad(now) {
   const n = now || new Date();
   const status = await fsp.sync.getStatus();
   const projects = coFilter(await fsp.sync.listProjects());
-  const [tasks, inspections, cards, photos] = await Promise.all(["task", "inspection", "takeoff", "photo"].map(async (t) => coFilter(await fsp.sync.getRecords(t))));
+  const [tasks, inspections, cards, photos, diary, expenses] = await Promise.all(["task", "inspection", "takeoff", "photo", "diary", "expense"].map(async (t) => coFilter(await fsp.sync.getRecords(t))));
   const month = n.toISOString().slice(0, 7);
   const open = tasks.filter((t) => t.data.status !== "Done");
   const overdue = open.filter((t) => tsDueStatus(t.data.dueDate) === "overdue").length;
@@ -54,6 +54,8 @@ async function hmLoad(now) {
   return {
     overdue, dueToday, status, hasProjects: Object.keys(status.projectsMeta).length > 0,
     openTasks: open.length, pct, inspectionsThisMonth: inspections.filter((r) => String(r.data.inspectionDate || r.updatedAt).startsWith(month)).length,
+    diaryThisMonth: diary.filter((r) => String(r.data.date || r.updatedAt).startsWith(month)).length,
+    expensesThisMonth: expenses.filter((r) => String(r.data.date || r.updatedAt).startsWith(month)).length,
     cards: cards.length, photos: photos.length, waiting: status.counts.unsent, conflicts: status.conflicts, perProject, activity,
   };
 }
@@ -92,9 +94,9 @@ async function renderHomeScreen() {
       ${tile("#/inspections", m.inspectionsThisMonth, "Inspections this month", "#7c3aed", "🔍")}
       ${tile("#/takeoff", m.cards, "Take-off cards", "#d97706", "📐")}
       ${tile("#/inspections", m.photos, "Photos", "#0891b2", "📷")}
+      ${tile("#/diary", m.diaryThisMonth, "Diary entries this month", "#be185d", "📒")}
+      ${tile("#/expenses", m.expensesThisMonth, "Expenses this month", "#0d9488", "🧾")}
     </div>
-    <div class="section-title">Quick add</div>
-    <div class="quick"><a href="#/diary/new"><span>📒</span>Diary</a><a href="#/expenses/new"><span>🧾</span>Expense</a><a href="#/tasks"><span>✅</span>Task</a><a href="#/inspections/new"><span>🔍</span>Inspection</a><a href="#/takeoff"><span>📐</span>Take-off</a></div>
     ${m.perProject.length ? `<div class="section-title">Projects</div>${m.perProject.map((x) => {
       const total = x.open + x.done;
       return `<div class="card proj" style="--c:${x.color}"><b>${escapeHtml(x.project.displayNumber)}</b> <span class="muted">${escapeHtml(x.project.clientName || "")}</span>

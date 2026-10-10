@@ -140,7 +140,6 @@ const JPG = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhc
   check(photo && photo.projectId === "p1" && photo.data.lat === 6.5 && photo.data.lng === 3.4 && photo.data.acc === 9 && stamps[0] && /6\.50000/.test(stamps[0].text), "receipt photo attached, stamped, with its coordinates");
   await a.waitFor(() => /Bright Hardware/.test(a.text("#main")), "listed");
   check(/₦12,500\.00/.test(a.text("#main")) && /Sent to desktop/.test(a.text("#main")) && /This month/.test(a.text("#main")), "list shows amount, status and the month total");
-  check(a.$$(".quick a").some((x) => /Expense/.test(x.textContent)) || true, "(home quick link checked below)");
   // the desktop marks it added: the phone shows it and locks it
   await w.fsp.sync.saveRecord(exp.id, { ...exp.data, status: "added", paymentId: "pay1" });
   await go(a, "#/expenses", "Expenses");
@@ -148,7 +147,7 @@ const JPG = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhc
   await go(a, "#/expenses/" + exp.id, "Expense");
   check(a.$("#exAmount").disabled && !a.$("#exSave") && /can no longer be changed/.test(a.text("#main")), "locked once the desktop has added it");
   await go(a, "#/home", "Home");
-  check(a.$$(".quick a").some((x) => /Expense/.test(x.textContent)), "Expense quick-add on Home");
+  check(a.$$(".tile").some((x) => /Expenses this month/.test(x.textContent) && x.getAttribute("href") === "#/expenses"), "Expenses card on Home");
 
   section("Before / During / After side by side");
   await go(a, "#/projects/" + CO + ":p1/snags/new", "Add snag").catch(() => {});
