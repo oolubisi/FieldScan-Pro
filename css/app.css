@@ -239,9 +239,9 @@ a.link-card .row { align-items: center; }
 /* ---- slimmer top line, one Menu button at the bottom ---- */
 #appbar { justify-content: flex-start; gap: 10px; }
 #appbar h1 { font-size: 17px; flex: none; }
-#homeBtn { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); margin: 0; font-size: 18px; text-decoration: none; line-height: 1; background: rgba(255,255,255,0.2); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; }
+#homeBtn { flex: none; margin: 0; font-size: 18px; text-decoration: none; line-height: 1; background: rgba(255,255,255,0.2); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; }
 #homeBtn[hidden] { display: none; }
-#coSwitch + #homeBtn, #coName + #homeBtn { margin-left: 0; }
+
 #coName { margin-left: auto; font-size: 13px; font-weight: 600; opacity: .9; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #coSwitch { margin-left: auto; margin-right: 0; }
 #coName:empty { display: none; }
@@ -263,3 +263,4 @@ a.link-card .row { align-items: center; }
 .hero .chip.search { position: absolute; top: 12px; right: 12px; margin: 0; width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; font-size: 17px; }
 #tabbar[hidden] { display: none; }
 #coName[data-page="1"] { display: none; }
+#main h2.dup-title { display: none; }

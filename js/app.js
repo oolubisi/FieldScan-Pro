@@ -48,6 +48,16 @@ async function renderCompanySwitch() {
 
 const PAGE_TITLES = { projects: "Projects", takeoff: "Take-Off", tasks: "Tasks", inspections: "Inspections", calculators: "Calculators", sync: "Sync", safety: "Safety", help: "Help", diary: "Site diary", expenses: "Expenses", search: "Search", conflicts: "Conflicts", "device-check": "Device check" };
 
+// The top bar already names the page, so a screen's own matching heading is hidden.
+function hideDupTitle() {
+  const t = (document.querySelector("#appbar h1") || {}).textContent;
+  document.querySelectorAll("#main h2").forEach((h) => h.classList.toggle("dup-title", h === document.querySelector("#main h2") && h.textContent.trim() === (t || "").trim() && t !== "FieldScan Pro"));
+}
+function watchTitles() {
+  const m = document.getElementById("main");
+  if (m && window.MutationObserver) new MutationObserver(hideDupTitle).observe(m, { childList: true });
+}
+
 function navigate() {
   const name = currentRoute();
   document.querySelectorAll("#tabbar a[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === ROUTES[name].tab));
@@ -133,6 +143,7 @@ async function boot() {
   }
   window.addEventListener("hashchange", navigate);
   navigate();
+  watchTitles();
   scStart();
 }
 
