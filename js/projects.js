@@ -112,7 +112,7 @@ async function renderProgressEdit(p, id) {
   const isSub = !!d.parentId;
   main.innerHTML = `${back}<h2>${isNew ? "Add progress" : isSub ? "Edit sub-task" : "Edit progress"}</h2>
     <div class="card">
-      <label class="field">Title<input id="pgTitle" maxlength="300" value="${escapeHtml(d.title || "")}"></label>
+      <label class="field">Title<input id="pgTitle" maxlength="300" data-dictate value="${escapeHtml(d.title || "")}"></label>
       ${isSub ? "" : `<label class="field">Trade<input id="pgTrade" maxlength="100" value="${escapeHtml(d.trade || "")}"></label>`}
       <label class="field">Percent complete${subs.length ? " (average of sub-tasks)" : ""}<input id="pgPercent" type="number" min="0" max="100" inputmode="numeric" value="${subs.length ? pjLogPct(rec, subs) : pjClamp(d.percent)}" ${subs.length ? "disabled" : ""}></label>
       <label class="field">Date<input id="pgDate" type="date" value="${escapeHtml(d.date || pjToday())}"></label>
@@ -156,7 +156,13 @@ async function pjSnagsTab(body, p, base, mine) {
   body.innerHTML = `<div class="toolbar"><a class="btn" id="pjNewSnag" href="${base}/snags/new">Add snag</a><span class="muted">${open} open · ${all.length - open} completed</span></div>
     ${all.length ? `<div class="card feed">${all.map((r) => `<a class="row link-row" href="${base}/snags/${escapeHtml(r.id)}" style="color:inherit;text-decoration:none;"><div class="grow"><strong>${escapeHtml(r.data.title || "Untitled")}</strong>
       <div class="muted">${escapeHtml([r.data.assigned, r.data.dateLogged].filter(Boolean).join(" · "))}</div></div><span class="muted">${r.data.status === "Completed" ? "Completed" : "Open"}</span></a>`).join("")}</div>`
-      : `<div class="card"><p class="muted">No snags logged.</p></div>`}`;
+      : `<div class="card"><p class="muted">No snags logged.</p></div>`}
+    ${all.length ? `<div class="toolbar"><button class="btn secondary" id="pjSnagShare">Share snag report (PDF)</button><button class="btn secondary" id="pjSnagPrint">Print</button></div>` : ""}`;
+  const withPhotos = async () => [all.slice().sort((a, b) => String(a.data.dateLogged || "").localeCompare(String(b.data.dateLogged || ""))), await fsp.sync.getRecords("photo")];
+  const sh = document.getElementById("pjSnagShare");
+  if (sh) sh.onclick = async () => { const [list, photos] = await withPhotos(); await rpShareSnags(p, list, photos); };
+  const pr = document.getElementById("pjSnagPrint");
+  if (pr) pr.onclick = async () => { const [list, photos] = await withPhotos(); rpPrintSnags(p, list, photos); };
 }
 
 async function renderSnagEdit(p, id) {
@@ -169,7 +175,7 @@ async function renderSnagEdit(p, id) {
   const d = rec ? rec.data : {};
   main.innerHTML = `${back}<h2>${isNew ? "Add snag" : "Edit snag"}</h2>
     <div class="card">
-      <label class="field">Title<input id="sgTitle" maxlength="300" value="${escapeHtml(d.title || "")}"></label>
+      <label class="field">Title<input id="sgTitle" maxlength="300" data-dictate value="${escapeHtml(d.title || "")}"></label>
       <label class="field">Notes<textarea id="sgNotes" rows="3" data-dictate>${escapeHtml(d.notes || "")}</textarea></label>
       <label class="field">Assigned to<input id="sgAssigned" maxlength="100" value="${escapeHtml(d.assigned || "")}"></label>
       <label class="field">Date logged<input id="sgDate" type="date" value="${escapeHtml(d.dateLogged || pjToday())}"></label>

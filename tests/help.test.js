@@ -26,7 +26,7 @@ const ids = Object.values(guides).flat().map((s) => s.id);
 check(new Set(ids).size === ids.length, "section ids are unique");
 check(Object.values(guides).flat().every((s) => s.title && s.body.length > 60), "every section has a title and a real body");
 const all = Object.values(guides).flat().map((s) => s.title).join("|");
-for (const topic of ["Companies and windows", "Estimates", "Reports and printing", "Settings", "Take-Off", "Inspections", "Dictation", "Calculators", "Backup, lock", "Working offline", "Sync tab"]) {
+for (const topic of ["Companies and windows", "Estimates", "Reports and printing", "Settings", "Take-Off", "Inspections", "Dictation", "Calculators", "Backup, lock", "Working offline", "Sync tab", "Phone expenses", "Financial audit trail", "Quick expenses", "Photo stamp", "Sharing reports as PDF", "The sync chip", "Projects"]) {
   check(all.includes(topic), "covers " + topic);
 }
 

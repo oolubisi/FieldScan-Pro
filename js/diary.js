@@ -41,16 +41,24 @@ async function renderDiaryList() {
       const [kind, label] = m.conflicted.has(r.id) ? ["bad", "Needs decision"] : TO_BADGE[fsp.sync.recordState(r)];
       return `<a class="row" href="#/diary/${escapeHtml(r.id)}" style="color:inherit;text-decoration:none;"><div class="ico" style="--c:#0891b2">📒</div><div class="grow"><b>${escapeHtml(r.data.date || "No date")}</b>${r.data.weather ? ` <span class="muted">· ${escapeHtml(r.data.weather)}</span>` : ""}<div class="sub">${escapeHtml([p ? p.displayNumber : "", String(r.data.progress || r.data.notes || "").slice(0, 70)].filter(Boolean).join(" · "))}</div></div><span class="badge ${kind}">${label}</span></a>`;
     }).join("")}</div>` : `<div class="empty-state">No diary entries${filter === "all" ? " yet" : " for this project"}.</div>`}
-    ${shown.length ? `<button class="btn secondary block" id="dyWeek">Weekly report (last 7 days, PDF)</button>` : ""}`;
+    ${shown.length ? `<button class="btn secondary block" id="dyWeek">Weekly report (last 7 days, print / save)</button><button class="btn secondary block" id="dyWeekShare" style="margin-top:8px;">Share weekly report (PDF)</button>` : ""}`;
   document.getElementById("dyFilter").onchange = (ev) => { renderDiaryList.filter = ev.target.value; renderDiaryList(); };
-  const wk = document.getElementById("dyWeek");
-  if (wk) wk.onclick = async () => {
+  const lastWeek = () => {
     const from = new Date(); from.setDate(from.getDate() - 6);
     const f = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
-    const week = shown.filter((r) => (r.data.date || "") >= f).sort((a, b) => String(a.data.date).localeCompare(String(b.data.date)));
+    return shown.filter((r) => (r.data.date || "") >= f).sort((a, b) => String(a.data.date).localeCompare(String(b.data.date)));
+  };
+  const wk = document.getElementById("dyWeek");
+  if (wk) wk.onclick = async () => {
+    const week = lastWeek();
     if (!week.length) { showStatus("No entries in the last 7 days.", true); return; }
-    const photos = await fsp.sync.getRecords("photo");
-    rpPrintDiary(week, m.projects, photos);
+    rpPrintDiary(week, m.projects, await fsp.sync.getRecords("photo"));
+  };
+  const wks = document.getElementById("dyWeekShare");
+  if (wks) wks.onclick = async () => {
+    const week = lastWeek();
+    if (!week.length) { showStatus("No entries in the last 7 days.", true); return; }
+    await rpShareDiary(week, m.projects, await fsp.sync.getRecords("photo"));
   };
 }
 
@@ -80,7 +88,7 @@ async function renderDiaryForm(id) {
       ${area("dyNotes", "Other notes", d.notes, "Delays, visitors, safety, anything else")}
     </div>
     ${r ? `<div class="card" id="dyPhotos"></div>` : `<p class="muted">Save the entry first, then add photos.</p>`}
-    <div class="toolbar"><button class="btn" id="dySave">Save</button>${r ? `<button class="btn secondary" id="dyReport">Report (PDF)</button><button class="btn danger" id="dyDelete">Delete</button>` : ""}</div>
+    <div class="toolbar"><button class="btn" id="dySave">Save</button>${r ? `<button class="btn secondary" id="dyReport">Report (print)</button><button class="btn secondary" id="dyShare">Share PDF</button><button class="btn danger" id="dyDelete">Delete</button>` : ""}</div>
     <div id="dyResult"></div>`;
   dtAttach(main);
   if (r) phMount(document.getElementById("dyPhotos"), r, `Diary ${d.date || ""}`.trim());
@@ -94,6 +102,8 @@ async function renderDiaryForm(id) {
   });
   const rep = document.getElementById("dyReport");
   if (rep) rep.onclick = async () => rpPrintDiary([r], m.projects, await fsp.sync.getRecords("photo"));
+  const shr = document.getElementById("dyShare");
+  if (shr) shr.onclick = async () => rpShareDiary([r], m.projects, await fsp.sync.getRecords("photo"));
   const del = document.getElementById("dyDelete");
   if (del) del.onclick = () => openModal("Delete entry?", `<p>The entry for ${escapeHtml(d.date || "this day")} will be deleted here and on the desktop.</p>`, async () => { await fsp.sync.deleteRecord(r.id); closeModal(); location.hash = "#/diary"; }, "Delete");
 }

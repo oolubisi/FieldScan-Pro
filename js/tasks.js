@@ -154,7 +154,7 @@ async function renderTaskEdit(taskId) {
     ${toBackLink("#/tasks", "Tasks")}
     <h2>Edit task</h2>
     <div class="card">
-      <label class="field">Title<input id="tsTitle" maxlength="300" value="${escapeHtml(t.data.title || "")}"></label>
+      <label class="field">Title<input id="tsTitle" maxlength="300" data-dictate value="${escapeHtml(t.data.title || "")}"></label>
       <label class="field">Notes<textarea id="tsNotes" rows="4" data-dictate>${escapeHtml(t.data.notes || "")}</textarea></label>
       <label class="field">Project<select id="tsProject"><option value="">No project</option>${projects.map((p) => `<option value="${escapeHtml(p.id)}" ${p.id === t.projectId ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select></label>
       <label class="field">Group<select id="tsGroup"><option value="">No group</option>${groups.map((g) => `<option value="${escapeHtml(g.id)}" ${g.id === t.data.groupId ? "selected" : ""}>${escapeHtml(g.data.name || "Untitled group")}</option>`).join("")}</select></label>

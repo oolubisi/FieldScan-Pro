@@ -84,7 +84,7 @@ async function renderHomeScreen() {
       ${tile("#/inspections", m.photos, "Photos", "#0891b2", "📷")}
     </div>
     <div class="section-title">Quick add</div>
-    <div class="quick"><a href="#/diary/new"><span>📒</span>Diary</a><a href="#/tasks"><span>✅</span>Task</a><a href="#/inspections/new"><span>🔍</span>Inspection</a><a href="#/takeoff"><span>📐</span>Take-off</a></div>
+    <div class="quick"><a href="#/diary/new"><span>📒</span>Diary</a><a href="#/expenses/new"><span>🧾</span>Expense</a><a href="#/tasks"><span>✅</span>Task</a><a href="#/inspections/new"><span>🔍</span>Inspection</a><a href="#/takeoff"><span>📐</span>Take-off</a></div>
     ${m.perProject.length ? `<div class="section-title">Projects</div>${m.perProject.map((x) => {
       const total = x.open + x.done;
       return `<div class="card proj" style="--c:${x.color}"><b>${escapeHtml(x.project.displayNumber)}</b> <span class="muted">${escapeHtml(x.project.clientName || "")}</span>

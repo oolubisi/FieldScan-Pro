@@ -13,8 +13,29 @@ function rpPrint(html) {
   window.print();
 }
 
-function rpPhotos(list) {
-  return list.length ? `<h3>Photographs</h3><div class="rp-photos">${list.map((p, i) => `<div class="rp-photo"><img src="data:${rpEsc(p.data.mime)};base64,${p.data.b64}" alt=""><div>Photo ${i + 1}${p.data.caption ? ": " + rpEsc(p.data.caption) : ""}</div></div>`).join("")}</div>` : "";
+function rpPhotos(list, stages) {
+  return list.length ? `<h3>Photographs</h3><div class="rp-photos">${list.map((p, i) => { const st = stages && stages[p.id]; return `<div class="rp-photo"><img src="data:${rpEsc(p.data.mime)};base64,${p.data.b64}" alt=""><div>Photo ${i + 1}${st ? " (" + rpEsc(st) + ")" : ""}${p.data.caption ? ": " + rpEsc(p.data.caption) : ""}</div></div>`; }).join("")}</div>` : "";
+}
+
+/** Snag list for one project: counts, each snag with who it is assigned to, its dates, and its photos (with their Before / During / After tags). */
+function rpSnagsHtml(project, snags, allPhotos) {
+  const open = snags.filter((s) => s.data.status !== "Completed").length;
+  return `<h1>Snag Report</h1><h2>${rpEsc(project ? project.displayNumber + " — " + project.clientName : "Project")}</h2>
+    <table class="rp-meta"><tr><td>Date</td><td>${rpEsc(new Date().toISOString().slice(0, 10))}</td></tr><tr><td>Open</td><td>${open}</td></tr><tr><td>Completed</td><td>${snags.length - open}</td></tr></table>
+    ${snags.map((s, i) => {
+      const d = s.data, done = d.status === "Completed";
+      const photos = allPhotos.filter((ph) => ph.data.parentId === s.id).sort((a, b) => String(a.data.takenAt).localeCompare(String(b.data.takenAt)));
+      return `<div class="rp-day"><h3>${i + 1}. ${rpEsc(d.title || "Untitled snag")} — ${done ? "COMPLETED" : "OPEN"}</h3>
+        <table class="rp-meta">${d.notes ? `<tr><td>Details</td><td>${rpPara(d.notes)}</td></tr>` : ""}${d.assigned ? `<tr><td>Assigned to</td><td>${rpEsc(d.assigned)}</td></tr>` : ""}<tr><td>Logged</td><td>${rpEsc(d.dateLogged || "")}</td></tr>${done && d.dateCompleted ? `<tr><td>Completed</td><td>${rpEsc(d.dateCompleted)}</td></tr>` : ""}</table>
+        ${photos.length ? `<div class="rp-photos">${photos.map((p, k) => { const st = (d.photoStages || {})[p.id]; return `<div class="rp-photo"><img src="data:${rpEsc(p.data.mime)};base64,${p.data.b64}" alt=""><div>${st ? rpEsc(st) + (p.data.caption ? ": " : "") : ""}${p.data.caption ? rpEsc(p.data.caption) : st ? "" : "Photo " + (k + 1)}</div></div>`; }).join("")}</div>` : ""}</div>`;
+    }).join("")}`;
+}
+
+const rpFileName = (s) => String(s || "report").replace(/[^A-Za-z0-9._ -]+/g, "_").trim().slice(0, 60) || "report";
+function rpShareInspection(rec, projects, allPhotos) {
+  const project = projects.find((p) => p.id === rec.projectId && p.companyKey === rec.companyKey);
+  const html = rpInspectionHtml(rec, project, allPhotos.filter((p) => p.data.parentId === rec.id).sort((a, b) => String(a.data.takenAt).localeCompare(String(b.data.takenAt))));
+  return rpSharePdf(html, rpFileName("Inspection " + (rec.data.title || "")), "Inspection report");
 }
 
 function rpInspectionHtml(rec, project, photos) {
@@ -46,3 +67,10 @@ function rpDiaryHtml(entries, projects, allPhotos) {
 }
 
 function rpPrintDiary(entries, projects, allPhotos) { rpPrint(rpDiaryHtml(entries, projects, allPhotos)); }
+
+function rpShareDiary(entries, projects, allPhotos) {
+  const first = entries[0].data.date || "";
+  return rpSharePdf(rpDiaryHtml(entries, projects, allPhotos), rpFileName("Site diary " + first), "Site diary");
+}
+function rpPrintSnags(project, snags, allPhotos) { rpPrint(rpSnagsHtml(project, snags, allPhotos)); }
+function rpShareSnags(project, snags, allPhotos) { return rpSharePdf(rpSnagsHtml(project, snags, allPhotos), rpFileName("Snags " + (project ? project.displayNumber : "")), "Snag report"); }

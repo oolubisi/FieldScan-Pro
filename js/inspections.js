@@ -89,7 +89,7 @@ async function renderInspectionForm(id) {
     <h2>${r ? "Edit inspection" : "New inspection"}</h2>
     <div class="card">
       ${!r && m.companies.length > 1 ? `<label class="field">Company<select id="inCompany">${m.companies.map((c) => `<option value="${escapeHtml(c.key)}" ${c.key === companyKey ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}</select></label>` : ""}
-      <label class="field">Title<input id="inTitle" maxlength="200" value="${escapeHtml(d.title || "")}" placeholder="e.g. Monthly site inspection"></label>
+      <label class="field">Title<input id="inTitle" maxlength="200" data-dictate value="${escapeHtml(d.title || "")}" placeholder="e.g. Monthly site inspection"></label>
       <label class="field">Project<select id="inProject"><option value="">No project</option>${projects.map((p) => `<option value="${escapeHtml(p.id)}" ${p.id === selectedProject ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select></label>
       <label class="field">Location<input id="inLocation" list="inLocations" maxlength="200" value="${escapeHtml(prefillLocation)}" placeholder="Site / address"><datalist id="inLocations">${locations.map((x) => `<option value="${escapeHtml(x)}">`).join("")}</datalist></label>
       <label class="field">Inspector<input id="inInspector" list="inInspectors" maxlength="120" value="${escapeHtml(prefillInspector)}"><datalist id="inInspectors">${inspectors.map((x) => `<option value="${escapeHtml(x)}">`).join("")}</datalist></label>
@@ -98,7 +98,7 @@ async function renderInspectionForm(id) {
     </div>
     <div class="card" id="inChecklist"></div>
     ${r ? `<div class="card" id="inPhotos"></div>` : `<p class="muted">Save the inspection first, then add photos.</p>`}
-    <div class="toolbar"><button class="btn" id="inSave">Save</button>${r ? `<button class="btn secondary" id="inReport">Report (PDF)</button><button class="btn danger" id="inDelete">Delete</button>` : ""}</div>
+    <div class="toolbar"><button class="btn" id="inSave">Save</button>${r ? `<button class="btn secondary" id="inReport">Report (print)</button><button class="btn secondary" id="inShare">Share PDF</button><button class="btn danger" id="inDelete">Delete</button>` : ""}</div>
     <div id="inResult"></div>`;
 
   if (r) phMount(document.getElementById("inPhotos"), r, r.data.title);
@@ -141,6 +141,11 @@ async function renderInspectionForm(id) {
   if (rep) rep.onclick = async () => {
     const fresh = (await fsp.sync.getRecords(INSP)).find((x) => x.id === r.id) || r;
     rpPrintInspection({ ...fresh, data: { ...fresh.data, items: checklist.getItems(), title: document.getElementById("inTitle").value || fresh.data.title, conclusion: document.getElementById("inConclusion").value } }, m.projects, await fsp.sync.getRecords("photo"));
+  };
+  const shr = document.getElementById("inShare");
+  if (shr) shr.onclick = async () => {
+    const fresh = (await fsp.sync.getRecords(INSP)).find((x) => x.id === r.id) || r;
+    await rpShareInspection({ ...fresh, data: { ...fresh.data, items: checklist.getItems(), title: document.getElementById("inTitle").value || fresh.data.title, conclusion: document.getElementById("inConclusion").value } }, m.projects, await fsp.sync.getRecords("photo"));
   };
   const del = document.getElementById("inDelete");
   if (del) del.onclick = () => {

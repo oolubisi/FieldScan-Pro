@@ -25,7 +25,7 @@ function dtAttach(root) {
     btn.onclick = () => {
       if (rec) { rec.stop(); return; }
       rec = new Rec();
-      rec.lang = "en-NG"; rec.interimResults = false; rec.continuous = false;
+      rec.lang = "en-NG"; rec.interimResults = false; rec.continuous = field.tagName === "TEXTAREA"; // long notes keep listening until you tap the mic again
       const before = field.value;
       btn.classList.add("on");
       rec.onresult = (ev) => {

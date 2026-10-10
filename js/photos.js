@@ -5,9 +5,52 @@
 
 const PH_MAX_SIDE = 1280;
 
-/** File -> { mime, b64, width, height }. Replaceable in tests (window.phShrinkImpl). */
-function phShrink(file) {
-  if (window.phShrinkImpl) return window.phShrinkImpl(file);
+// ----- date / time / GPS stamp -----
+const PH_STAMP_KEY = "fsp-photostamp";
+/** Whether new photos are stamped with date, time and location (on by default; changed on the Sync screen). */
+function phStampEnabled(set) {
+  try {
+    if (set !== undefined) { localStorage.setItem(PH_STAMP_KEY, set ? "on" : "off"); return set; }
+    return localStorage.getItem(PH_STAMP_KEY) !== "off";
+  } catch (e) { return set === undefined ? true : set; }
+}
+
+/** The text burned onto a photo: "10 Oct 2026 14:32 · 6.52411, 3.37921 (±12 m)". */
+function phStampText(info) {
+  const d = new Date(info.at);
+  const date = `${d.getDate()} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()]} ${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return info.lat == null ? date : `${date} · ${info.lat.toFixed(5)}, ${info.lng.toFixed(5)}${info.acc != null ? ` (±${Math.round(info.acc)} m)` : ""}`;
+}
+
+/** { at, lat?, lng?, acc?, text } for the next photos, or null when stamping is off. The location is asked for once, with a short wait; without it the stamp is just the time. Replaceable in tests (window.phGeoImpl). */
+async function phStampInfo() {
+  if (!phStampEnabled()) return null;
+  const info = { at: new Date().toISOString() };
+  try {
+    const pos = window.phGeoImpl ? await window.phGeoImpl() : await new Promise((res, rej) => {
+      if (!navigator.geolocation) return rej(new Error("none"));
+      navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 });
+    });
+    if (pos && pos.coords && Number.isFinite(pos.coords.latitude)) { info.lat = pos.coords.latitude; info.lng = pos.coords.longitude; info.acc = pos.coords.accuracy; }
+  } catch (e) { /* no permission or no signal: time only */ }
+  info.text = phStampText(info);
+  return info;
+}
+
+/** Burns the stamp into the bottom-left corner of a canvas (a dark strip so it reads on any photo). */
+function phDrawStamp(ctx, w, h, text) {
+  const size = Math.max(14, Math.round(Math.min(w, h) * 0.035));
+  ctx.font = `600 ${size}px sans-serif`;
+  const pad = Math.round(size * 0.4), tw = Math.min(w - pad * 2, ctx.measureText(text).width + pad * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(0, h - size - pad * 2, tw + pad, size + pad * 2);
+  ctx.fillStyle = "#fff"; ctx.textBaseline = "middle";
+  ctx.fillText(text, pad, h - size / 2 - pad, w - pad * 2);
+}
+
+/** File -> { mime, b64, width, height }. `stamp` (from phStampInfo) is burned in. Replaceable in tests (window.phShrinkImpl). */
+function phShrink(file, stamp) {
+  if (window.phShrinkImpl) return window.phShrinkImpl(file, stamp);
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -16,7 +59,9 @@ function phShrink(file) {
       const w = Math.max(1, Math.round(img.naturalWidth * scale)), h = Math.max(1, Math.round(img.naturalHeight * scale));
       const canvas = document.createElement("canvas");
       canvas.width = w; canvas.height = h;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      if (stamp && stamp.text) phDrawStamp(ctx, w, h, stamp.text);
       URL.revokeObjectURL(url);
       resolve({ mime: "image/jpeg", b64: canvas.toDataURL("image/jpeg", 0.7).split(",")[1], width: w, height: h });
     };
@@ -150,23 +195,27 @@ async function phMount(box, parent, label, opts) {
       <input type="checkbox" class="ph-pick" aria-label="Select photo">${stages ? `<select class="ph-stage" aria-label="Stage"><option value="">No stage</option>${["Before", "During", "After"].map((s) => `<option value="${s}" ${stages[p.id] === s ? "selected" : ""}>${s}</option>`).join("")}</select>` : ""}
       <button type="button" class="ph-del" aria-label="Remove photo">×</button>${p.data.caption ? `<div class="ph-cap">${escapeHtml(p.data.caption)}</div>` : ""}</div>`).join("")}</div>
     ${photos.length ? `<p class="muted" style="font-size:12px; margin:0 0 8px;">Tap a photo to view, rotate or delete it.</p>` : ""}
+    ${stages && phStageGroups(photos, stages).filled >= 2 ? `<button type="button" class="btn secondary block ph-compare" style="margin-bottom:8px;">Compare Before / During / After</button>` : ""}
     <label class="btn secondary block ph-add">Add photo<input type="file" class="ph-file" accept="image/*" capture="environment" multiple hidden></label>
     ${photos.length ? `<label class="field"><input type="checkbox" class="ph-all"> Select all</label><button type="button" class="btn secondary block ph-save" style="margin-top:8px;">Download selected</button>
       <p class="muted" style="font-size:12px;">Photos go to this phone's Downloads. If a file with the same name is already there, Chrome keeps both and adds (1) to the new one; the browser doesn't let the app replace it.</p>` : ""}
     <div class="ph-result"></div>`;
   const fail = (m) => { box.querySelector(".ph-result").innerHTML = resultBox([m], true); };
   box.querySelector(".ph-file").onchange = async (ev) => {
+    const stamp = await phStampInfo();
     for (const file of [...ev.target.files]) {
       try {
-        const s = await phShrink(file);
+        const s = await phShrink(file, stamp);
         await fsp.sync.createRecord({
           type: "photo", companyKey: parent.companyKey, projectId: parent.projectId || undefined,
-          data: { parentId: parent.id, mime: s.mime, b64: s.b64, width: s.width, height: s.height, takenAt: new Date().toISOString() },
+          data: { parentId: parent.id, mime: s.mime, b64: s.b64, width: s.width, height: s.height, takenAt: (stamp && stamp.at) || new Date().toISOString(), ...(stamp && stamp.lat != null ? { lat: stamp.lat, lng: stamp.lng, acc: stamp.acc } : {}) },
         });
       } catch (e) { return fail(e.message || String(e)); }
     }
     await phMount(box, parent, label, opts);
   };
+  const cmp = box.querySelector(".ph-compare");
+  if (cmp) cmp.onclick = () => phOpenCompare(phStageGroups(photos, stages), label);
   box.querySelectorAll(".ph-stage").forEach((sel) => {
     sel.onchange = () => pjSetStage(parent.id, sel.closest(".ph-item").dataset.id, sel.value);
   });
@@ -186,4 +235,27 @@ async function phMount(box, parent, label, opts) {
   box.querySelectorAll(".ph-del").forEach((b) => {
     b.onclick = async () => { await fsp.sync.deleteRecord(b.closest(".ph-item").dataset.id); await phMount(box, parent, label, opts); };
   });
+}
+
+// ----- Before / During / After side by side -----
+
+const PH_STAGES = ["Before", "During", "After"];
+
+/** { Before: [photo...], During: [...], After: [...], filled: how many of the three have a photo } */
+function phStageGroups(photos, stages) {
+  const g = { Before: [], During: [], After: [] };
+  photos.forEach((p) => { const s = (stages || {})[p.id]; if (g[s]) g[s].push(p); });
+  g.filled = PH_STAGES.filter((s) => g[s].length).length;
+  return g;
+}
+
+/** Full-screen: the stages as columns (stacked on a narrow phone), every photo of each stage under its label. */
+function phOpenCompare(groups, label) {
+  const el = document.createElement("div");
+  el.id = "phCompare"; el.className = "ph-viewer ph-cmp";
+  const cols = PH_STAGES.filter((s) => groups[s].length);
+  el.innerHTML = `<div class="ph-v-top"><span>${escapeHtml(label || "Photos")}</span><button type="button" class="btn secondary small ph-v-close">Close</button></div>
+    <div class="ph-cmp-grid" style="grid-template-columns:repeat(${cols.length},1fr)">${cols.map((s) => `<div class="ph-cmp-col"><div class="ph-cmp-h">${s}</div>${groups[s].map((p) => `<figure><img alt="${s}" src="data:${escapeHtml(p.data.mime)};base64,${p.data.b64}">${p.data.caption ? `<figcaption>${escapeHtml(p.data.caption)}</figcaption>` : ""}</figure>`).join("")}</div>`).join("")}</div>`;
+  document.body.appendChild(el);
+  el.querySelector(".ph-v-close").onclick = () => el.remove();
 }

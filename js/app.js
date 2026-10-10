@@ -1,12 +1,13 @@
 // ===== App shell: boot, routing, and the Sync screen =====
 
-const APP_VERSION = "0.8.2 (Companies)";
+const APP_VERSION = "0.9.0 (Receipts, PDF share, GPS)";
 const fsp = { db: null, sync: null, storageError: null };
 window.APP_VERSION = APP_VERSION;
 window.fsp = fsp;
 
 const ROUTES = {
   diary: { tab: "home", render: () => renderDiaryScreen() },
+  expenses: { tab: "home", render: () => renderExpensesScreen() },
   search: { tab: "home", render: () => renderSearchScreen() },
   projects: { tab: "projects", render: () => renderProjectsScreen() },
   home: { tab: "home", render: () => renderHomeScreen() },
@@ -107,6 +108,7 @@ async function boot() {
   }
   window.addEventListener("hashchange", navigate);
   navigate();
+  scStart();
 }
 
 // ---------- Sync screen ----------
@@ -229,6 +231,7 @@ async function renderSyncScreen() {
     <div class="card">
       <h3>This phone</h3>
       <p class="muted">Device ID <b>${escapeHtml(status.deviceId)}</b> \u00b7 App version ${escapeHtml(APP_VERSION)}</p>
+      <label style="display:flex;gap:10px;align-items:center;font-weight:600;margin:6px 0 10px;"><input type="checkbox" id="geoStampBox" ${phStampEnabled() ? "checked" : ""}> Stamp photos with date, time and GPS location</label>
       <a class="btn secondary block" href="#/help" style="text-align:center; text-decoration:none; margin-bottom:8px;">Help</a>
       <a class="btn secondary block" href="#/safety" style="text-align:center; text-decoration:none; margin-bottom:8px;">Backup, storage, lock &amp; history</a>
       <a class="btn secondary block" href="#/device-check" style="text-align:center; text-decoration:none;">Device check</a>
@@ -246,6 +249,8 @@ async function renderSyncScreen() {
       document.getElementById("folderCardResult").innerHTML = resultBox(lines, !r.ok);
     });
   };
+  const geoBox = document.getElementById("geoStampBox");
+  if (geoBox) geoBox.onchange = () => { phStampEnabled(geoBox.checked); showStatus(geoBox.checked ? "New photos will carry the date, time and location." : "New photos will not be stamped."); };
   const autoBox = document.getElementById("autoSyncBox");
   if (autoBox) autoBox.onchange = () => { asEnabled(autoBox.checked); if (autoBox.checked && fsp.autoSync) fsp.autoSync.tick(true); renderSyncScreen(); };
   const syncBtn = document.getElementById("folderSync");
@@ -253,6 +258,7 @@ async function renderSyncScreen() {
     await withBusy(ev.currentTarget, async () => {
       const r = await fsp.folder.syncNow();
       await renderSyncScreen();
+      scRefresh();
       const lines = r.ok ? r.lines.concat(r.problems.map((p) => `${p.file}: ${p.reason}`)) : [r.error];
       document.getElementById("folderCardResult").innerHTML = resultBox(lines, !r.ok || r.problems.length > 0);
     });
