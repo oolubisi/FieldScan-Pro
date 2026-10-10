@@ -59,7 +59,7 @@ function startAutoSync() {
       const got = r && r.ok ? (r.applied || 0) : 0;
       if (got) showStatus(`Auto-sync: ${got} update${got === 1 ? "" : "s"} received.`);
       else if (r && !r.ok && r.code === "permission") showStatus(r.error, true);
-      if (got && /^#\/(home|sync)?$/.test(location.hash)) navigate(); // refresh screens with nothing being typed
+      if ((got && /^#\/(home|sync)?$/.test(location.hash)) || (r && r.ok && /^#\/(home)?$/.test(location.hash))) navigate(); // refresh screens with nothing being typed
     },
   });
   fsp.autoSync = a; a.lastAt = 0; a.last = null;

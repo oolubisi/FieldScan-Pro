@@ -58,8 +58,13 @@ function watchTitles() {
   if (m && window.MutationObserver) new MutationObserver(hideDupTitle).observe(m, { childList: true });
 }
 
+let lastRouteName = null;
+
 function navigate() {
   const name = currentRoute();
+  const cameBackHome = name === "home" && lastRouteName && lastRouteName !== "home";
+  lastRouteName = name;
+  if (cameBackHome && window.fsp && fsp.autoSync && fsp.autoSync.tick) fsp.autoSync.tick(true).catch(() => {}); // returning to Home syncs (when automatic sync is on)
   document.querySelectorAll("#tabbar a[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === ROUTES[name].tab));
   const home = document.getElementById("homeBtn");
   if (home) home.hidden = name === "home";

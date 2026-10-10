@@ -88,6 +88,11 @@ const T0 = new Date("2026-10-05T10:00:00Z");
     await a.waitFor(() => a.$("#main h2").classList.contains("dup-title"), "the repeated page heading is hidden");
     a.w.location.hash = "#/home"; await a.waitFor(() => a.$("#main .hero"), "Home again");
     check(!a.$("#tabbar").hidden && a.text("#appbar h1") === "FieldScan Pro", "Home: Menu button and app name show");
+    { let ticks = 0; a.w.fsp.autoSync = { tick: async () => { ticks++; return null; } };
+      a.w.location.hash = "#/tasks"; await a.waitFor(() => a.text("#main h2") === "Tasks", "Tasks"); a.w.location.hash = "#/home"; await a.waitFor(() => a.$("#main .hero"), "Home");
+      check(ticks === 1, "returning to Home from another page starts a sync: " + ticks);
+      a.w.location.hash = "#/home"; await new Promise((ok) => setTimeout(ok, 60));
+      check(ticks === 1, "staying on Home does not sync again"); delete a.w.fsp.autoSync; }
     a.$("#menuBtn").click(); a.$('#menuPanel a[data-route="tasks"]').dispatchEvent(new a.w.MouseEvent("click", { bubbles: true })); check(a.$("#menuPanel").hidden, "choosing an item closes the Menu");
     await a.waitFor(() => a.w.location.hash === "#/tasks" && a.$("#tabbar a.active") && a.$("#tabbar a.active").dataset.route === "tasks", "the chosen section opens");
     a.w.location.hash = "#/device-check";
