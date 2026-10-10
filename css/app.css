@@ -239,8 +239,9 @@ a.link-card .row { align-items: center; }
 /* ---- slimmer top line, one Menu button at the bottom ---- */
 #appbar { justify-content: flex-start; gap: 10px; }
 #appbar h1 { font-size: 17px; flex: none; }
-#homeBtn { font-size: 15px; font-weight: 700; text-decoration: none; line-height: 1; color: #fff; background: rgba(255,255,255,0.2); border-radius: 14px; padding: 6px 10px; white-space: nowrap; flex: none; }
+#homeBtn { margin-left: 0; font-size: 18px; text-decoration: none; line-height: 1; background: rgba(255,255,255,0.2); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
 #homeBtn[hidden] { display: none; }
+#coSwitch + #homeBtn, #coName + #homeBtn { margin-left: 0; }
 #coName { margin-left: auto; font-size: 13px; font-weight: 600; opacity: .9; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #coSwitch { margin-left: auto; margin-right: 0; }
 #coName:empty { display: none; }
