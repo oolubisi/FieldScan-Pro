@@ -55,7 +55,7 @@ async function renderInspectionList() {
     ${toBanner(m)}
     ${m.companies.length ? "" : `<div class="card"><h3>No project list yet</h3><p class="muted">Inspections are sent to the right company on the desktop. On the desktop, press <b>Write project list</b> (or <b>Sync now</b>), then tap <b>Sync now</b> on this phone's Sync tab.</p></div>`}
     <div class="toolbar">
-      <select id="inFilter" aria-label="Project"><option value="all">All inspections</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${m.projects.map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select>
+      <select id="inFilter" aria-label="Project"><option value="all">All inspections</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${pjLive(m.projects).map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select>
       <a class="btn" id="inNew" href="#/inspections/new" ${m.companies.length ? "" : 'aria-disabled="true" style="pointer-events:none;opacity:.5;"'}>New inspection</a>
     </div>
     ${shown.length ? `<div class="card">${shown.map((r) => inRow(m, r)).join("")}</div>` : `<div class="empty-state">No inspections yet.</div>`}`;
@@ -76,7 +76,7 @@ async function renderInspectionForm(id) {
   const d = r ? r.data : {};
   const companyKey = r ? r.companyKey : (renderInspectionList.company && m.companies.some((c) => c.key === renderInspectionList.company) ? renderInspectionList.company : (latest && m.companies.some((c) => c.key === latest.companyKey) ? latest.companyKey : (m.companies[0] || {}).key));
   const filterProject = !r ? m.projects.find((p) => p.key === renderInspectionList.filter) : null;
-  const projects = m.projects.filter((p) => p.companyKey === companyKey);
+  const projects = pjLive(m.projects.filter((p) => p.companyKey === companyKey), r && r.projectId);
   const sameCompany = latest && latest.companyKey === companyKey ? latest : null;
   const selectedProject = r ? r.projectId : filterProject ? filterProject.id : sameCompany && sameCompany.projectId ? sameCompany.projectId : "";
   const prefillLocation = r ? d.location || "" : sameCompany && sameCompany.projectId === selectedProject ? sameCompany.data.location || "" : "";

@@ -119,6 +119,17 @@ const go = async (a, hash, h2) => { a.w.location.hash = hash; await a.waitFor(()
   check((await a.w.fsp.sync.getRecords("takeoff")).find((c) => c.id === card.id).projectId === rec.id, "take-off stays attached");
   await go(a, "#/prospects/" + rec.id, "Prospects").catch(() => {});
 
+  section("Handed-over projects stay out of lists");
+  const hs = P.makeProjectsSnapshot({ origin: DT, company: { key: CO, name: "PI Projects" }, now: T0,
+    projects: [{ id: "p1", displayNumber: "PRJ/26/001", clientName: "Live", siteLocation: "", status: "Active" }, { id: "h1", displayNumber: "PRJ/25/009", clientName: "Done Client", siteLocation: "", status: "Handed Over" }] });
+  await a.w.fsp.sync.importFiles([file("h.json", hs)]);
+  await go(a, "#/projects", "Projects");
+  check(/Live/.test(a.text("#main")) && !/Done Client/.test(a.text("#main")), "Projects list hides handed-over");
+  await go(a, "#/takeoff", "Take-Off");
+  check(![...a.$("#toFilter").options].some((o) => /Done Client/.test(o.textContent)), "pickers hide handed-over");
+  const lp = await a.w.fsp.sync.listProjects();
+  check(lp.find((p) => p.id === "h1").handedOver === true, "still known for labels on old records");
+
   section("Delete");
   const p2 = await a.w.fsp.sync.createRecord({ type: "prospect", companyKey: CO, data: { code: "PROS-X-1", client: "Mrs Bello", status: "open" } });
   const c2 = await a.w.fsp.sync.createRecord({ type: "takeoff", companyKey: CO, projectId: p2.id, data: { title: "Roof", lineItems: [] } });

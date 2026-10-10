@@ -64,4 +64,6 @@ function coSet(key) { try { if (key) localStorage.setItem(CO_STORE, key); else l
 /** Keeps only the current company's projects or records. */
 function coFilter(list) { const c = coCurrent(); return c ? list.filter((x) => x.companyKey === c) : list; }
 /** The companies the forms may offer: just the current one when a company is chosen. */
+/** Projects still in progress: drops handed-over ones, except `keepId` (a record being edited keeps its project). */
+function pjLive(list, keepId) { return list.filter((p) => !p.handedOver || p.id === keepId); }
 function coCompanies(list) { const c = coCurrent(); return c ? list.filter((x) => x.key === c) : list; }

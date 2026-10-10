@@ -427,6 +427,7 @@
             displayNumber: r.data.code || "PROSPECT", clientName: (r.data.client || "") + " (prospect)", siteLocation: r.data.location || "", isProspect: true });
         });
       }
+      rows.forEach((p) => { p.handedOver = p.status === "Handed Over"; });
       return rows.sort((a, b) => (a.companyName + a.displayNumber).localeCompare(b.companyName + b.displayNumber));
     }
 

@@ -39,7 +39,7 @@ async function hmLoad(now) {
   const dueToday = open.filter((t) => tsDueStatus(t.data.dueDate) === "today").length;
   const done = tasks.length - open.length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
-  const perProject = projects.map((p) => {
+  const perProject = pjLive(projects).map((p) => {
     const mine = (r) => r.projectId === p.id && r.companyKey === p.companyKey;
     const t = tasks.filter(mine), openN = t.filter((x) => x.data.status !== "Done").length;
     return { project: p, color: hmColor(p.key || p.id), open: openN, done: t.length - openN, inspections: inspections.filter(mine).length, cards: cards.filter(mine).length, photos: photos.filter(mine).length };

@@ -115,7 +115,7 @@ async function renderTakeoffGroups() {
   const model = await toLoad();
   const filter = renderTakeoffGroups.filter || "all";
   const shown = model.groups.filter((g) => filter === "all" || `${g.companyKey}:${g.projectId}` === filter);
-  const projectOptions = `<option value="all">All projects</option>` + model.projects.map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(toProjectLabel(p))}</option>`).join("");
+  const projectOptions = `<option value="all">All projects</option>` + pjLive(model.projects).map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(toProjectLabel(p))}</option>`).join("");
 
   main.innerHTML = `
     <h2>Take-Off</h2>
@@ -140,7 +140,7 @@ async function renderTakeoffGroups() {
     const preset = filter !== "all" ? filter : "";
     openModal("New take-off group",
       `<label class="field">Group name<input id="tgName" maxlength="120" placeholder="e.g. Ground floor finishes"></label>
-       <label class="field">Project<select id="tgProject"><option value="">Choose a project</option>${model.projects.map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === preset ? "selected" : ""}>${escapeHtml(toProjectLabel(p))}</option>`).join("")}</select></label>`,
+       <label class="field">Project<select id="tgProject"><option value="">Choose a project</option>${pjLive(model.projects).map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === preset ? "selected" : ""}>${escapeHtml(toProjectLabel(p))}</option>`).join("")}</select></label>`,
       async () => {
         const name = document.getElementById("tgName").value.trim();
         const project = model.projects.find((p) => p.key === document.getElementById("tgProject").value);

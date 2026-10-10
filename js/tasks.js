@@ -95,7 +95,7 @@ async function renderTaskList() {
       <label class="field">Project<select id="tsAddProject"></select></label>
       <button class="btn block" id="tsAdd" style="margin-top:10px;" ${m.companies.length ? "" : "disabled"}>Add</button>
     </div>
-    <div class="toolbar"><select id="tsFilter" aria-label="Project"><option value="all">All tasks</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${m.projects.map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select>
+    <div class="toolbar"><select id="tsFilter" aria-label="Project"><option value="all">All tasks</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${pjLive(m.projects).map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select>
       <select id="tsDueFilter" aria-label="Due"><option value="">Any due date</option><option value="overdue" ${dueOnly ? "selected" : ""}>Overdue only</option></select></div>
     ${groupsWithOpen.map((g) => `<div class="card"><h3>${escapeHtml(g.data.name || "Untitled group")}</h3>${open.filter((t) => t.data.groupId === g.id).map((t) => tsRow(m, t)).join("")}</div>`).join("")}
     ${ungrouped.length ? `<div class="card">${ungrouped.map((t) => tsRow(m, t)).join("")}</div>` : (groupsWithOpen.length ? "" : `<div class="empty-state">${shown.length ? "Nothing open. Well done." : "No tasks yet."}</div>`)}
@@ -108,7 +108,7 @@ async function renderTaskList() {
   const latestTask = [...m.tasks].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
   const fillAddProjects = (preferred) => {
     const key = company ? company.value : lastCompany;
-    const list = m.projects.filter((p) => p.companyKey === key);
+    const list = pjLive(m.projects.filter((p) => p.companyKey === key));
     const want = preferred !== undefined ? preferred : (m.projects.find((p) => p.key === filter) || {}).id || (latestTask && latestTask.companyKey === key ? latestTask.projectId : "") || "";
     document.getElementById("tsAddProject").innerHTML = `<option value="">No project</option>` + list.map((p) => `<option value="${escapeHtml(p.id)}" ${p.id === want ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("");
   };
@@ -148,7 +148,7 @@ async function renderTaskEdit(taskId) {
     main.innerHTML = `${toBackLink("#/tasks", "Tasks")}<div class="card"><h3>Needs your decision</h3><p class="muted">This task was changed on both the phone and the desktop. Choose which version to keep before editing it.</p><a class="btn block" href="#/conflicts">Decide now</a></div>`;
     return;
   }
-  const projects = m.projects.filter((p) => p.companyKey === t.companyKey);
+  const projects = pjLive(m.projects.filter((p) => p.companyKey === t.companyKey), t.projectId);
   const groups = m.groups.filter((g) => g.companyKey === t.companyKey);
   main.innerHTML = `
     ${toBackLink("#/tasks", "Tasks")}

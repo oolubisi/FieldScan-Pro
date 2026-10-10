@@ -53,7 +53,7 @@ async function renderExpenseForm(id) {
   const locked = r && (d.status === "added");
   const latest = !r ? [...m.items].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0] : null;
   const companyKey = r ? r.companyKey : (latest && m.companies.some((c) => c.key === latest.companyKey) ? latest.companyKey : (m.companies[0] || {}).key);
-  const projects = m.projects.filter((p) => p.companyKey === companyKey);
+  const projects = pjLive(m.projects.filter((p) => p.companyKey === companyKey));
   const selected = r ? r.projectId : (latest && latest.companyKey === companyKey ? latest.projectId : "") || "";
   const opts = (list, cur) => list.map((x) => `<option ${x === cur ? "selected" : ""}>${escapeHtml(x)}</option>`).join("");
   main.innerHTML = `${toBackLink("#/expenses", "Expenses")}

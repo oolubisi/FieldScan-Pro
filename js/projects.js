@@ -51,7 +51,7 @@ async function renderProjectList() {
   }
   main.innerHTML = `<h2>Projects</h2>${toBanner(m)}
     <div class="toolbar"><a class="btn secondary" href="#/prospects">Prospects</a><a class="btn" href="#/prospects/new">＋ New prospect</a></div>
-    ${m.projects.length ? m.projects.map((p) => {
+    ${pjLive(m.projects).length ? pjLive(m.projects).map((p) => {
       const c = counts[p.key] || { progress: 0, snag: 0 };
       return `<a class="card link-card" href="#/projects/${encodeURIComponent(p.key)}" style="display:block;color:inherit;text-decoration:none;">
         <h3>${escapeHtml(p.displayNumber + " — " + (p.clientName || ""))}</h3>

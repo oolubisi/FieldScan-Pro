@@ -33,7 +33,7 @@ async function renderDiaryList() {
     <h2>Site diary</h2>
     ${toBanner(m)}
     <div class="toolbar">
-      <select id="dyFilter" aria-label="Project"><option value="all">All projects</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${m.projects.map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select>
+      <select id="dyFilter" aria-label="Project"><option value="all">All projects</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${pjLive(m.projects).map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select>
       <a class="btn" href="#/diary/new" ${m.companies.length ? "" : 'aria-disabled="true" style="pointer-events:none;opacity:.5;"'}>New entry</a>
     </div>
     ${shown.length ? `<div class="card feed">${shown.map((r) => {
@@ -71,7 +71,7 @@ async function renderDiaryForm(id) {
   const latest = !r ? [...m.items].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0] : null;
   const d = r ? r.data : {};
   const companyKey = r ? r.companyKey : (latest && m.companies.some((c) => c.key === latest.companyKey) ? latest.companyKey : (m.companies[0] || {}).key);
-  const projects = m.projects.filter((p) => p.companyKey === companyKey);
+  const projects = pjLive(m.projects.filter((p) => p.companyKey === companyKey), r && r.projectId);
   const selected = r ? r.projectId : (latest && latest.companyKey === companyKey ? latest.projectId : "") || "";
   const area = (idn, label, val, ph, rows) => `<label class="field">${label}<textarea id="${idn}" rows="${rows || 3}" data-dictate placeholder="${ph}">${escapeHtml(val || "")}</textarea></label>`;
   main.innerHTML = `
