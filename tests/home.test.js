@@ -103,6 +103,7 @@ const photoIs = (a) => a.$$(".ph-item");
   check(!/No project list yet/.test(a.text("#main")), "hint gone once projects exist");
   check(a.w.hmColor("x") === a.w.hmColor("x") && /^#/.test(a.w.hmColor("y")), "project colours are stable");
   check(a.w.hmAgo(new Date(Date.now() - 5 * 60000).toISOString()) === "5 min ago" && a.w.hmAgo(new Date().toISOString()) === "just now", "relative times");
+  check(a.$(".hero .chip.search") && a.$(".hero .chip.search").getAttribute("href") === "#/search" && !a.$("#searchBtn") && !a.$("#appbar #themeBtn"), "Search sits at the end of the greeting box, not in the top line");
   // theme button cycles and is remembered
   check(a.text("#themeBtn") === "Auto", "starts on Auto");
   a.$("#themeBtn").click(); check(a.w.document.documentElement.dataset.theme === "light" && a.text("#themeBtn") === "Light", "Light");

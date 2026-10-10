@@ -72,10 +72,15 @@ const T0 = new Date("2026-10-05T10:00:00Z");
   {
     const a = await bootApp();
     check(/^Good (morning|afternoon|evening)$/.test(a.text("#main .hero h2")), "opens on Home");
-    check(a.$("#tabbar a.active").dataset.route === "home", "the Home tab is highlighted");
+    check(!a.$("#tabbar a.active") && a.$("#homeBtn").hidden, "on Home there is no tab highlighted and no Home icon");
+    check(a.$("#menuBtn") && a.$("#menuPanel").hidden && a.$$("#menuPanel a[data-route]").length === 6 && !a.$("#tabbar a[data-route=\"home\"]"), "one Menu button holds the six other sections");
+    a.$("#menuBtn").click(); check(!a.$("#menuPanel").hidden && a.$("#themeBtn") && a.$("#menuBtn").getAttribute("aria-expanded") === "true", "Menu opens with the theme switch inside");
+    a.$("#menuBtn").click(); check(a.$("#menuPanel").hidden, "Menu closes");
     a.w.location.hash = "#/sync";
     await a.waitFor(() => a.text("#main h2") === "Sync", "the Sync screen");
-    check(a.$("#tabbar a.active").dataset.route === "sync", "the Sync tab is highlighted");
+    check(a.$("#tabbar a.active").dataset.route === "sync" && !a.$("#homeBtn").hidden && a.$("#homeBtn").getAttribute("href") === "#/home", "the Sync item is highlighted and every other page has the Home icon");
+    a.$("#menuBtn").click(); a.$('#menuPanel a[data-route="tasks"]').dispatchEvent(new a.w.MouseEvent("click", { bubbles: true })); check(a.$("#menuPanel").hidden, "choosing an item closes the Menu");
+    await a.waitFor(() => a.w.location.hash === "#/tasks" && a.$("#tabbar a.active") && a.$("#tabbar a.active").dataset.route === "tasks", "the chosen section opens");
     a.w.location.hash = "#/device-check";
     await a.waitFor(() => a.text("#main h2") === "Device check", "the Device check screen");
     check(a.$("#tabbar a.active").dataset.route === "sync", "the Device check belongs to the Sync tab");

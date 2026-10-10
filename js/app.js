@@ -38,6 +38,8 @@ async function renderCompanySwitch() {
   const keys = Object.keys(meta);
   if (!keys.includes(coCurrent())) coSet(keys[0] || ""); // first company until one is chosen
   sel.hidden = keys.length < 2;
+  const nm = document.getElementById("coName");
+  if (nm) nm.textContent = keys.length === 1 ? (meta[keys[0]].name || "") : "";
   if (keys.length < 2) return;
   sel.innerHTML = keys.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(meta[k].name || "Company")}</option>`).join("");
   sel.value = coCurrent();
@@ -46,7 +48,10 @@ async function renderCompanySwitch() {
 
 function navigate() {
   const name = currentRoute();
-  document.querySelectorAll("#tabbar a").forEach((a) => a.classList.toggle("active", a.dataset.route === ROUTES[name].tab));
+  document.querySelectorAll("#tabbar a[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === ROUTES[name].tab));
+  const home = document.getElementById("homeBtn");
+  if (home) home.hidden = name === "home";
+  closeMenu();
   document.getElementById("main").scrollTop = 0;
   Promise.resolve(renderCompanySwitch()).catch(() => {}).then(() => ROUTES[name].render()).catch((e) => {
     document.getElementById("main").innerHTML = `<div class="card"><h3>Something went wrong</h3><p class="muted">${escapeHtml(e.message || e)}</p></div>`;
@@ -91,7 +96,22 @@ function setupTheme() {
   };
 }
 
+/** The single Menu button at the bottom: opens the list of sections and the theme switch. */
+function closeMenu() {
+  const p = document.getElementById("menuPanel"), b = document.getElementById("menuBtn");
+  if (p) p.hidden = true;
+  if (b) b.setAttribute("aria-expanded", "false");
+}
+function setupMenu() {
+  const btn = document.getElementById("menuBtn"), panel = document.getElementById("menuPanel");
+  if (!btn || !panel) return;
+  btn.onclick = (e) => { e.stopPropagation(); const open = panel.hidden; panel.hidden = !open; btn.setAttribute("aria-expanded", open ? "true" : "false"); };
+  panel.addEventListener("click", (e) => { if (e.target.closest("a")) closeMenu(); e.stopPropagation(); });
+  document.addEventListener("click", closeMenu);
+}
+
 async function boot() {
+  setupMenu();
   setupTheme();
   setupLock();
   registerServiceWorker();

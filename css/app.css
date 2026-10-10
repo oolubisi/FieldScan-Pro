@@ -235,3 +235,24 @@ a.link-card .row { align-items: center; }
 .ph-cmp-grid { flex: 1; min-height: 0; overflow: auto; display: grid; gap: 6px; padding: 0 6px 12px; align-items: start; }
 .ph-cmp-col { min-width: 0; } .ph-cmp-h { text-align: center; font-weight: 700; padding: 6px 0; background: #1c1c1c; border-radius: 6px; margin-bottom: 6px; }
 .ph-cmp-col figure { margin: 0 0 8px; } .ph-cmp-col img { width: 100%; border-radius: 6px; display: block; } .ph-cmp-col figcaption { font-size: 11px; color: #ccc; padding: 2px 0; }
+
+/* ---- slimmer top line, one Menu button at the bottom ---- */
+#appbar { justify-content: flex-start; gap: 10px; }
+#appbar h1 { font-size: 17px; flex: none; }
+#homeBtn { font-size: 20px; text-decoration: none; line-height: 1; }
+#homeBtn[hidden] { display: none; }
+#coName { margin-left: auto; font-size: 13px; font-weight: 600; opacity: .9; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#coSwitch { margin-left: auto; margin-right: 0; }
+#coName:empty { display: none; }
+#tabbar { position: relative; flex-wrap: nowrap; }
+#menuBtn { flex: 1; padding: 13px 8px; border: 0; background: var(--card); color: var(--text, inherit); font-size: 15px; font-weight: 700; }
+#menuBtn[aria-expanded="true"] { color: var(--accent); }
+#menuPanel { position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 -6px 24px rgba(0,0,0,.22); padding: 6px; z-index: 50; }
+#menuPanel[hidden] { display: none; }
+#tabbar #menuPanel a { flex: none; display: block; text-align: left; padding: 13px 14px; font-size: 16px; border: 0; border-radius: 10px; color: inherit; }
+#tabbar #menuPanel a.active { background: rgba(37,99,235,.12); color: var(--accent); }
+#menuPanel .menu-theme { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; border-top: 1px solid var(--line); margin-top: 4px; font-size: 16px; }
+#menuPanel .menu-theme #themeBtn { background: rgba(128,128,128,.2); color: inherit; }
+#tabbar #menuPanel a.sync-chip { margin: 2px 4px 6px; padding: 8px 12px; font-size: 13px; max-width: none; }
+#menuPanel .sync-chip.idle { background: #64748b; }
+.hero .chip.search { text-decoration: none; margin-left: auto; }

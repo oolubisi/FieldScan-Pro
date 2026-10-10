@@ -11,16 +11,20 @@
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <header id="appbar"><h1>FieldScan Pro</h1><a id="syncChip" class="sync-chip idle" href="#/sync" hidden></a><select id="coSwitch" aria-label="Company" hidden></select><a id="searchBtn" href="#/search" aria-label="Search">🔍</a><button id="themeBtn" type="button" aria-label="Change theme">Auto</button></header>
+  <header id="appbar"><a id="homeBtn" href="#/home" aria-label="Home" hidden>🏠</a><h1>FieldScan Pro</h1><span id="coName"></span><select id="coSwitch" aria-label="Company" hidden></select></header>
   <main id="main"></main>
   <nav id="tabbar">
-    <a href="#/home" data-route="home">Home</a>
-    <a href="#/projects" data-route="projects">Projects</a>
-    <a href="#/takeoff" data-route="takeoff">Take-Off</a>
-    <a href="#/tasks" data-route="tasks">Tasks</a>
-    <a href="#/inspections" data-route="inspections">Inspect</a>
-    <a href="#/calculators" data-route="calculators">Calculators</a>
-    <a href="#/sync" data-route="sync">Sync</a>
+    <button id="menuBtn" type="button" aria-haspopup="true" aria-expanded="false">☰ Menu</button>
+    <div id="menuPanel" hidden>
+      <a id="syncChip" class="sync-chip idle" href="#/sync" hidden></a>
+      <a href="#/projects" data-route="projects">Projects</a>
+      <a href="#/takeoff" data-route="takeoff">Take-Off</a>
+      <a href="#/tasks" data-route="tasks">Tasks</a>
+      <a href="#/inspections" data-route="inspections">Inspect</a>
+      <a href="#/calculators" data-route="calculators">Calculators</a>
+      <a href="#/sync" data-route="sync">Sync</a>
+      <div class="menu-theme"><span>Theme</span><button id="themeBtn" type="button" aria-label="Change theme">Auto</button></div>
+    </div>
   </nav>
 
   <div id="status-bar" role="status" aria-live="polite"></div>

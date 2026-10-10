@@ -75,7 +75,7 @@ async function renderHomeScreen() {
   main.innerHTML = `
     <div class="hero"><h2>${hmGreeting(now)}</h2>
       <div class="date">${escapeHtml(now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }))}</div>
-      <div class="chips"><a class="chip" href="#/sync">${m.waiting || m.conflicts ? "↻ Needs syncing" : "✓ All synced"}</a><span class="chip">${m.openTasks} open task${m.openTasks === 1 ? "" : "s"}</span></div></div>
+      <div class="chips"><a class="chip" href="#/sync">${m.waiting || m.conflicts ? "↻ Needs syncing" : "✓ All synced"}</a><span class="chip">${m.openTasks} open task${m.openTasks === 1 ? "" : "s"}</span><a class="chip search" href="#/search" aria-label="Search">🔍 Search</a></div></div>
     ${alerts}
     <div class="tiles">
       <a class="tile" href="#/tasks" style="--c:#16a34a"><div class="ring" style="--p:${m.pct}"><span>${m.pct}%</span></div><div><div class="num">${m.openTasks}</div><div class="lbl">Open tasks</div></div></a>
