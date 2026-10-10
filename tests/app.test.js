@@ -79,6 +79,11 @@ const T0 = new Date("2026-10-05T10:00:00Z");
     a.w.location.hash = "#/sync";
     await a.waitFor(() => a.text("#main h2") === "Sync", "the Sync screen");
     check(a.$("#tabbar a.active").dataset.route === "sync" && !a.$("#homeBtn").hidden && a.$("#homeBtn").getAttribute("href") === "#/home", "the Sync item is highlighted and every other page has the Home icon");
+    for (const r of ["projects", "takeoff", "tasks", "inspections", "calculators", "sync", "safety", "help", "diary", "expenses", "search", "conflicts"]) {
+      a.w.location.hash = "#/" + r; await new Promise((ok) => setTimeout(ok, 40));
+      check(!a.$("#homeBtn").hidden, "Home icon shows on " + r);
+    }
+    a.w.location.hash = "#/sync"; await a.waitFor(() => a.text("#main h2") === "Sync", "back on Sync");
     a.$("#menuBtn").click(); a.$('#menuPanel a[data-route="tasks"]').dispatchEvent(new a.w.MouseEvent("click", { bubbles: true })); check(a.$("#menuPanel").hidden, "choosing an item closes the Menu");
     await a.waitFor(() => a.w.location.hash === "#/tasks" && a.$("#tabbar a.active") && a.$("#tabbar a.active").dataset.route === "tasks", "the chosen section opens");
     a.w.location.hash = "#/device-check";

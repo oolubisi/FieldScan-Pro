@@ -84,9 +84,9 @@ async function renderHomeScreen() {
   ].join("");
   const tile = (href, num, lbl, color, ico) => `<a class="tile" href="${href}" style="--c:${color}"><div class="ico">${ico}</div><div><div class="num">${num}</div><div class="lbl">${lbl}</div></div></a>`;
   main.innerHTML = `
-    <div class="hero"><h2>${hmGreeting(now)}</h2>
+    <div class="hero"><a class="chip search" href="#/search" aria-label="Search" title="Search">🔍</a><h2>${hmGreeting(now)}</h2>
       <div class="date">${escapeHtml(now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }))}</div>
-      <div class="chips"><a class="chip" href="#/sync">${m.waiting || m.conflicts ? "↻ Needs syncing" : "✓ All synced"}</a><span class="chip">${m.openTasks} open task${m.openTasks === 1 ? "" : "s"}</span><a class="chip search" href="#/search" aria-label="Search" title="Search">🔍</a></div>
+      <div class="chips"><a class="chip" href="#/sync">${m.waiting || m.conflicts ? "↻ Needs syncing" : "✓ All synced"}</a><span class="chip">${m.openTasks} open task${m.openTasks === 1 ? "" : "s"}</span></div>
       <div class="last-sync">${escapeHtml(hmSyncLine(lastSync))}</div></div>
     ${alerts}
     <div class="tiles">
@@ -94,7 +94,7 @@ async function renderHomeScreen() {
       ${tile("#/inspections", m.inspectionsThisMonth, "Inspections this month", "#7c3aed", "🔍")}
       ${tile("#/takeoff", m.cards, "Take-off cards", "#d97706", "📐")}
       ${tile("#/inspections", m.photos, "Photos", "#0891b2", "📷")}
-      ${tile("#/diary", m.diaryThisMonth, "Diary entries this month", "#be185d", "📒")}
+      ${tile("#/diary", m.diaryThisMonth, "Diary entries", "#be185d", "📒")}
       ${tile("#/expenses", m.expensesThisMonth, "Expenses this month", "#0d9488", "🧾")}
     </div>
     ${m.perProject.length ? `<div class="section-title">Projects</div>${m.perProject.map((x) => {

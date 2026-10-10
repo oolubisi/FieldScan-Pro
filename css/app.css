@@ -143,7 +143,7 @@ a.link-card:active { transform: scale(0.985); }
 @media (prefers-reduced-motion: reduce) { #main > * { animation: none; } }
 
 /* ---- Home ---- */
-.hero { border-radius: 16px; padding: 18px 16px; margin-bottom: 14px; color: #fff; background: linear-gradient(135deg, #1d4ed8, #0ea5e9 70%, #14b8a6); box-shadow: 0 6px 20px rgba(37,99,235,0.28); }
+.hero { position: relative; border-radius: 16px; padding: 18px 16px; margin-bottom: 14px; color: #fff; background: linear-gradient(135deg, #1d4ed8, #0ea5e9 70%, #14b8a6); box-shadow: 0 6px 20px rgba(37,99,235,0.28); }
 .hero h2 { margin: 0 0 2px; font-size: 22px; color: #fff; }
 .hero .date { opacity: 0.9; font-size: 14px; }
 .hero .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -239,7 +239,7 @@ a.link-card .row { align-items: center; }
 /* ---- slimmer top line, one Menu button at the bottom ---- */
 #appbar { justify-content: flex-start; gap: 10px; }
 #appbar h1 { font-size: 17px; flex: none; }
-#homeBtn { font-size: 20px; text-decoration: none; line-height: 1; }
+#homeBtn { font-size: 15px; font-weight: 700; text-decoration: none; line-height: 1; color: #fff; background: rgba(255,255,255,0.2); border-radius: 14px; padding: 6px 10px; white-space: nowrap; flex: none; }
 #homeBtn[hidden] { display: none; }
 #coName { margin-left: auto; font-size: 13px; font-weight: 600; opacity: .9; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #coSwitch { margin-left: auto; margin-right: 0; }
@@ -259,3 +259,4 @@ a.link-card .row { align-items: center; }
 
 .hero .last-sync { margin-top: 10px; font-size: 12.5px; opacity: 0.9; }
 .hero .chip.search { padding: 5px 10px; font-size: 15px; }
+.hero .chip.search { position: absolute; top: 12px; right: 12px; margin: 0; width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; font-size: 17px; }
