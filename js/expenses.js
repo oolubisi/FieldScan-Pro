@@ -11,7 +11,7 @@ const exMoney = (v) => "₦" + moneyValue(v);
 
 async function exLoad() {
   const status = await fsp.sync.getStatus();
-  const projects = coFilter(await fsp.sync.listProjects());
+  const projects = coFilter(await fsp.sync.listProjects({ excludeProspects: true }));
   const items = coFilter(await fsp.sync.getRecords(EXPENSE));
   const photos = await fsp.sync.getRecords("photo");
   const companies = coCompanies(Object.keys(status.projectsMeta).map((k) => ({ key: k, name: status.projectsMeta[k].name })));

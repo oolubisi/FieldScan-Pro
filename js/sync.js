@@ -415,8 +415,18 @@
 
     // ---------- status for the UI ----------
 
-    async function listProjects() {
+    /** Real projects from the desktop, plus open prospects (shaped like projects so every picker just works). */
+    async function listProjects(opts) {
       const rows = await db.getAll("projects");
+      if (!(opts && opts.excludeProspects)) {
+        const meta = await db.kvGet("projectsMeta", {});
+        const have = new Set(rows.map((p) => p.companyKey + ":" + p.id));
+        (await db.getAll("records")).filter((r) => r.type === "prospect" && !r.deleted && r.data.status !== "converted").forEach((r) => {
+          if (have.has(r.companyKey + ":" + r.id)) return;
+          rows.push({ key: `${r.companyKey}:${r.id}`, companyKey: r.companyKey, companyName: (meta[r.companyKey] || {}).name || "", id: r.id,
+            displayNumber: r.data.code || "PROSPECT", clientName: (r.data.client || "") + " (prospect)", siteLocation: r.data.location || "", isProspect: true });
+        });
+      }
       return rows.sort((a, b) => (a.companyName + a.displayNumber).localeCompare(b.companyName + b.displayNumber));
     }
 

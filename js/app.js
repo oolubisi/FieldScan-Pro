@@ -10,6 +10,7 @@ const ROUTES = {
   expenses: { tab: "home", render: () => renderExpensesScreen() },
   search: { tab: "home", render: () => renderSearchScreen() },
   projects: { tab: "projects", render: () => renderProjectsScreen() },
+  prospects: { tab: "projects", render: () => renderProspectsScreen() },
   home: { tab: "home", render: () => renderHomeScreen() },
   takeoff: { tab: "takeoff", render: () => renderTakeoffScreen() },
   tasks: { tab: "tasks", render: () => renderTasksScreen() },
@@ -46,7 +47,7 @@ async function renderCompanySwitch() {
   sel.onchange = () => { coSet(sel.value); navigate(); };
 }
 
-const PAGE_TITLES = { projects: "Projects", takeoff: "Take-Off", tasks: "Tasks", inspections: "Inspections", calculators: "Calculators", sync: "Sync", safety: "Safety", help: "Help", diary: "Site diary", expenses: "Expenses", search: "Search", conflicts: "Conflicts", "device-check": "Device check" };
+const PAGE_TITLES = { projects: "Projects", prospects: "Prospects", takeoff: "Take-Off", tasks: "Tasks", inspections: "Inspections", calculators: "Calculators", sync: "Sync", safety: "Safety", help: "Help", diary: "Site diary", expenses: "Expenses", search: "Search", conflicts: "Conflicts", "device-check": "Device check" };
 
 // The top bar already names the page, so a screen's own matching heading is hidden.
 function hideDupTitle() {

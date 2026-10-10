@@ -30,7 +30,7 @@ async function pjSetStage(parentId, photoId, stage) {
 }
 
 async function pjLoad() {
-  const projects = coFilter(await fsp.sync.listProjects());
+  const projects = coFilter(await fsp.sync.listProjects({ excludeProspects: true }));
   const conflicts = await fsp.sync.getConflicts();
   return { projects, conflicts };
 }
@@ -50,6 +50,7 @@ async function renderProjectList() {
     const k = `${r.companyKey}:${r.projectId}`; counts[k] = counts[k] || { progress: 0, snag: 0 }; counts[k][type]++;
   }
   main.innerHTML = `<h2>Projects</h2>${toBanner(m)}
+    <div class="toolbar"><a class="btn secondary" href="#/prospects">Prospects</a><a class="btn" href="#/prospects/new">＋ New prospect</a></div>
     ${m.projects.length ? m.projects.map((p) => {
       const c = counts[p.key] || { progress: 0, snag: 0 };
       return `<a class="card link-card" href="#/projects/${encodeURIComponent(p.key)}" style="display:block;color:inherit;text-decoration:none;">
