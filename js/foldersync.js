@@ -249,7 +249,7 @@
         const sent = await sync.exportBundle({
           onlyIfNeeded: true,
           waitingInFolder,
-          includeAcks: out.applied > 0,
+          includeAcks: out.applied > 0 || out.duplicates > 0, // also when the desktop re-offers something we already hold, so it can stop offering it
           deliver: async (filename, text) => { await writeFile(handle, filename, text); wroteName = filename; },
         });
         out.sent = sent.sent || 0;
