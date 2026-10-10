@@ -256,3 +256,6 @@ a.link-card .row { align-items: center; }
 #tabbar #menuPanel a.sync-chip { margin: 2px 4px 6px; padding: 8px 12px; font-size: 13px; max-width: none; }
 #menuPanel .sync-chip.idle { background: #64748b; }
 .hero .chip.search { text-decoration: none; margin-left: auto; }
+
+.hero .last-sync { margin-top: 10px; font-size: 12.5px; opacity: 0.9; }
+.hero .chip.search { padding: 5px 10px; font-size: 15px; }

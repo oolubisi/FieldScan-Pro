@@ -104,6 +104,8 @@ const photoIs = (a) => a.$$(".ph-item");
   check(a.w.hmColor("x") === a.w.hmColor("x") && /^#/.test(a.w.hmColor("y")), "project colours are stable");
   check(a.w.hmAgo(new Date(Date.now() - 5 * 60000).toISOString()) === "5 min ago" && a.w.hmAgo(new Date().toISOString()) === "just now", "relative times");
   check(a.$(".hero .chip.search") && a.$(".hero .chip.search").getAttribute("href") === "#/search" && !a.$("#searchBtn") && !a.$("#appbar #themeBtn"), "Search sits at the end of the greeting box, not in the top line");
+  check(a.$(".hero .chip.search").textContent.trim() === "🔍", "Search is icon only");
+  check(/^Last sync: /.test(a.text(".hero .last-sync")), "last line of the greeting box shows the last sync");
   // theme button cycles and is remembered
   check(a.text("#themeBtn") === "Auto", "starts on Auto");
   a.$("#themeBtn").click(); check(a.w.document.documentElement.dataset.theme === "light" && a.text("#themeBtn") === "Light", "Light");

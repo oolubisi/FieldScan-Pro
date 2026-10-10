@@ -58,12 +58,21 @@ async function hmLoad(now) {
   };
 }
 
+/** "Last sync: Sat 10 Oct, 08:15" or "Not synced yet". */
+function hmSyncLine(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || !Number.isFinite(d.getTime())) return "Last sync: not yet";
+  return `Last sync: ${d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}, ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+}
+
 async function renderHomeScreen() {
   const main = document.getElementById("main");
   if (!fsp.sync) { main.innerHTML = `<h2>Home</h2><div class="card"><h3>Storage isn't available</h3><p class="muted">This browser isn't letting the app save data.</p></div>`; return; }
   const m = await hmLoad();
   const now = new Date();
   try { if (navigator.setAppBadge) (m.overdue + m.dueToday) ? navigator.setAppBadge(m.overdue + m.dueToday) : navigator.clearAppBadge(); } catch (e) { /* not supported */ }
+  let lastSync = null;
+  try { if (fsp.folder) lastSync = (await fsp.folder.status()).lastSync || null; } catch (e) { /* no folder */ }
   const alerts = [
     m.conflicts ? `<a class="alert" style="--c:var(--bad)" href="#/conflicts">⚠️ <span>${m.conflicts} record${m.conflicts === 1 ? "" : "s"} changed on both phone and desktop. Tap to decide.</span></a>` : "",
     m.overdue ? `<a class="alert" style="--c:var(--bad)" href="#/tasks" data-overdue>⏰ <span>${m.overdue} task${m.overdue === 1 ? " is" : "s are"} overdue.</span></a>` : "",
@@ -75,7 +84,8 @@ async function renderHomeScreen() {
   main.innerHTML = `
     <div class="hero"><h2>${hmGreeting(now)}</h2>
       <div class="date">${escapeHtml(now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }))}</div>
-      <div class="chips"><a class="chip" href="#/sync">${m.waiting || m.conflicts ? "↻ Needs syncing" : "✓ All synced"}</a><span class="chip">${m.openTasks} open task${m.openTasks === 1 ? "" : "s"}</span><a class="chip search" href="#/search" aria-label="Search">🔍 Search</a></div></div>
+      <div class="chips"><a class="chip" href="#/sync">${m.waiting || m.conflicts ? "↻ Needs syncing" : "✓ All synced"}</a><span class="chip">${m.openTasks} open task${m.openTasks === 1 ? "" : "s"}</span><a class="chip search" href="#/search" aria-label="Search" title="Search">🔍</a></div>
+      <div class="last-sync">${escapeHtml(hmSyncLine(lastSync))}</div></div>
     ${alerts}
     <div class="tiles">
       <a class="tile" href="#/tasks" style="--c:#16a34a"><div class="ring" style="--p:${m.pct}"><span>${m.pct}%</span></div><div><div class="num">${m.openTasks}</div><div class="lbl">Open tasks</div></div></a>
