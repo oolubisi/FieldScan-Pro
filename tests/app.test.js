@@ -84,6 +84,9 @@ const T0 = new Date("2026-10-05T10:00:00Z");
       check(!a.$("#homeBtn").hidden, "Home icon shows on " + r);
     }
     a.w.location.hash = "#/sync"; await a.waitFor(() => a.text("#main h2") === "Sync", "back on Sync");
+    check(a.$("#tabbar").hidden && a.text("#appbar h1") === "Sync", "other pages: no Menu button, the top bar shows the page name");
+    a.w.location.hash = "#/home"; await a.waitFor(() => a.$("#main .hero"), "Home again");
+    check(!a.$("#tabbar").hidden && a.text("#appbar h1") === "FieldScan Pro", "Home: Menu button and app name show");
     a.$("#menuBtn").click(); a.$('#menuPanel a[data-route="tasks"]').dispatchEvent(new a.w.MouseEvent("click", { bubbles: true })); check(a.$("#menuPanel").hidden, "choosing an item closes the Menu");
     await a.waitFor(() => a.w.location.hash === "#/tasks" && a.$("#tabbar a.active") && a.$("#tabbar a.active").dataset.route === "tasks", "the chosen section opens");
     a.w.location.hash = "#/device-check";

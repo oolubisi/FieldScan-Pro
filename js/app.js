@@ -46,11 +46,16 @@ async function renderCompanySwitch() {
   sel.onchange = () => { coSet(sel.value); navigate(); };
 }
 
+const PAGE_TITLES = { projects: "Projects", takeoff: "Take-Off", tasks: "Tasks", inspections: "Inspections", calculators: "Calculators", sync: "Sync", safety: "Safety", help: "Help", diary: "Site diary", expenses: "Expenses", search: "Search", conflicts: "Conflicts", "device-check": "Device check" };
+
 function navigate() {
   const name = currentRoute();
   document.querySelectorAll("#tabbar a[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === ROUTES[name].tab));
   const home = document.getElementById("homeBtn");
   if (home) home.hidden = name === "home";
+  const bar = document.getElementById("tabbar"); if (bar) bar.hidden = name !== "home";
+  const h1 = document.querySelector("#appbar h1"); if (h1) h1.textContent = name === "home" ? "FieldScan Pro" : (PAGE_TITLES[name] || "FieldScan Pro");
+  const cn = document.getElementById("coName"); if (cn) cn.dataset.page = name === "home" ? "" : "1";
   closeMenu();
   document.getElementById("main").scrollTop = 0;
   Promise.resolve(renderCompanySwitch()).catch(() => {}).then(() => ROUTES[name].render()).catch((e) => {
