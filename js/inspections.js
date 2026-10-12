@@ -58,7 +58,7 @@ async function renderInspectionList() {
       <select id="inFilter" aria-label="Project"><option value="all">All inspections</option><option value="none" ${filter === "none" ? "selected" : ""}>No project</option>${pjLive(m.projects).map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(p.displayNumber + " — " + p.clientName)}</option>`).join("")}</select>
       <a class="btn" id="inNew" href="#/inspections/new" ${m.companies.length ? "" : 'aria-disabled="true" style="pointer-events:none;opacity:.5;"'}>New inspection</a>
     </div>
-    ${shown.length ? `<div class="card">${shown.map((r) => inRow(m, r)).join("")}</div>` : `<div class="empty-state">No inspections yet.</div>`}`;
+    ${shown.length ? `<div class="card">${shown.map((r) => inRow(m, r)).join("")}</div>` : `<div class="empty-state"><h3>No inspections yet</h3><p class="muted">Tap New inspection to start a checklist with photos and notes.</p></div>`}`;
   document.getElementById("inFilter").onchange = (ev) => { renderInspectionList.filter = ev.target.value; renderInspectionList(); };
 }
 

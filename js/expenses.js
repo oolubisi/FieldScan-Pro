@@ -41,7 +41,7 @@ async function renderExpenseList() {
       const [kind, label] = exStatusBadge(r.data.status);
       const n = m.photos.filter((ph) => ph.data.parentId === r.id).length;
       return `<a class="row" href="#/expenses/${escapeHtml(r.id)}" style="color:inherit;text-decoration:none;"><div class="ico" style="--c:#dc2626">🧾</div><div class="grow"><b>${exMoney(r.data.amount)}</b> <span class="muted">· ${escapeHtml(r.data.payee || "")}</span><div class="sub">${escapeHtml([r.data.date, p ? p.displayNumber : "No project", r.data.category, n ? n + " photo" + (n === 1 ? "" : "s") : ""].filter(Boolean).join(" · "))}</div></div><span class="badge ${kind}">${label}</span></a>`;
-    }).join("")}</div>` : `<div class="empty-state">No expenses yet. Tap Add expense, photograph the receipt and save.</div>`}`;
+    }).join("")}</div>` : `<div class="empty-state"><h3>No expenses yet</h3><p class="muted">Tap Add expense, photograph the receipt and save.</p></div>`}`;
 }
 
 async function renderExpenseForm(id) {

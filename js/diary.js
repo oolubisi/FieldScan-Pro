@@ -40,7 +40,7 @@ async function renderDiaryList() {
       const p = m.projects.find((x) => x.id === r.projectId && x.companyKey === r.companyKey);
       const [kind, label] = m.conflicted.has(r.id) ? ["bad", "Needs decision"] : TO_BADGE[fsp.sync.recordState(r)];
       return `<a class="row" href="#/diary/${escapeHtml(r.id)}" style="color:inherit;text-decoration:none;"><div class="ico" style="--c:#0891b2">📒</div><div class="grow"><b>${escapeHtml(r.data.date || "No date")}</b>${r.data.weather ? ` <span class="muted">· ${escapeHtml(r.data.weather)}</span>` : ""}<div class="sub">${escapeHtml([p ? p.displayNumber : "", String(r.data.progress || r.data.notes || "").slice(0, 70)].filter(Boolean).join(" · "))}</div></div><span class="badge ${kind}">${label}</span></a>`;
-    }).join("")}</div>` : `<div class="empty-state">No diary entries${filter === "all" ? " yet" : " for this project"}.</div>`}
+    }).join("")}</div>` : `<div class="empty-state"><h3>No diary entries${filter === "all" ? " yet" : " for this project"}</h3><p class="muted">Record the day's weather, labour, deliveries and progress. Tap New entry.</p></div>`}
     ${shown.length ? `<button class="btn secondary block" id="dyWeek">Weekly report (last 7 days, print / save)</button><button class="btn secondary block" id="dyWeekShare" style="margin-top:8px;">Share weekly report (PDF)</button>` : ""}`;
   document.getElementById("dyFilter").onchange = (ev) => { renderDiaryList.filter = ev.target.value; renderDiaryList(); };
   const lastWeek = () => {

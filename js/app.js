@@ -54,9 +54,19 @@ function hideDupTitle() {
   const t = (document.querySelector("#appbar h1") || {}).textContent;
   document.querySelectorAll("#main h2").forEach((h) => h.classList.toggle("dup-title", h === document.querySelector("#main h2") && h.textContent.trim() === (t || "").trim() && t !== "FieldScan Pro"));
 }
+/** On list screens the main "New ..." button floats at the bottom right, where a thumb can reach it. */
+function fabify() {
+  const m = document.getElementById("main");
+  if (!m) return;
+  m.querySelectorAll(".fab").forEach((b) => b.classList.remove("fab"));
+  if (m.querySelector("a.back")) return; // detail and form screens keep their own buttons
+  const tb = m.querySelector(":scope > .toolbar");
+  const b = tb && [...tb.querySelectorAll(".btn:not(.secondary):not(.danger)")].find((x) => /^(New|Add|＋)/.test(x.textContent.trim()));
+  if (b && !b.closest("form")) { b.classList.add("fab"); m.classList.add("has-fab"); } else m.classList.remove("has-fab");
+}
 function watchTitles() {
   const m = document.getElementById("main");
-  if (m && window.MutationObserver) new MutationObserver(hideDupTitle).observe(m, { childList: true });
+  if (m && window.MutationObserver) new MutationObserver(() => { hideDupTitle(); fabify(); }).observe(m, { childList: true });
 }
 
 let lastRouteName = null;

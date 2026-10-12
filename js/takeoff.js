@@ -133,7 +133,7 @@ async function renderTakeoffGroups() {
         <div class="row"><div class="ico" style="--c:#d97706">📁</div><div class="grow"><b>${escapeHtml(g.data.name || "Untitled group")}</b>
         <div class="sub">${escapeHtml(project ? toProjectLabel(project) : "Project not in your list")} · ${count} take-off${count === 1 ? "" : "s"}</div></div>
         <span class="badge ${kind}">${label}</span></div></a>`;
-    }).join("") : `<div class="empty-state">No take-off groups${filter === "all" ? " yet" : " for this project"}.</div>`}`;
+    }).join("") : `<div class="empty-state"><h3>No take-off groups${filter === "all" ? " yet" : " for this project"}</h3><p class="muted">A group holds the take-offs for one part of a job, such as the substructure. Tap New group.</p></div>`}`;
 
   document.getElementById("toFilter").onchange = (ev) => { renderTakeoffGroups.filter = ev.target.value; renderTakeoffGroups(); };
   document.getElementById("toNewGroup").onclick = () => {
@@ -182,7 +182,7 @@ async function renderTakeoffGroup(groupId) {
         <div class="row"><div class="ico" style="--c:#d97706">📐</div><div class="grow"><b>${escapeHtml(c.data.title || "Untitled")}</b>
         <div class="sub">${n} item${n === 1 ? "" : "s"}${c.data.date ? " · " + escapeHtml(c.data.date) : ""}${c.data.notes ? " · " + escapeHtml(c.data.notes.slice(0, 60)) : ""}</div></div>
         <span class="badge ${kind}">${label}</span></div></a>`;
-    }).join("") : `<div class="empty-state">No take-offs in this group yet.</div>`}`;
+    }).join("") : `<div class="empty-state"><h3>No take-offs in this group yet</h3><p class="muted">Add one for each trade or sector, then list its items and quantities.</p></div>`}`;
 
   document.getElementById("toRenameGroup").onclick = () => {
     openModal("Rename group", `<label class="field">Group name<input id="tgName" maxlength="120" value="${escapeHtml(group.data.name || "")}"></label>`, async () => {
@@ -274,7 +274,17 @@ async function renderTakeoffCard(groupId, cardId) {
   const box = document.getElementById("toLines");
   if (!lines.length) box.insertAdjacentHTML("beforeend", toLineRowHtml({ id: toNewLineId(), kind: "item" }));
   box.onclick = (ev) => { const b = ev.target.closest(".to-remove"); if (b) b.closest(".to-line").remove(); };
-  document.getElementById("toAddItem").onclick = () => box.insertAdjacentHTML("beforeend", toLineRowHtml({ id: toNewLineId(), kind: "item" }));
+  const addItem = () => { box.insertAdjacentHTML("beforeend", toLineRowHtml({ id: toNewLineId(), kind: "item" })); const last = box.lastElementChild; const f = last && last.querySelector(".to-desc"); if (f) f.focus(); };
+  document.getElementById("toAddItem").onclick = addItem;
+  // quick entry: Enter moves description -> quantity -> a new row
+  box.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" || ev.target.tagName === "TEXTAREA") return;
+    const row = ev.target.closest(".to-line"); if (!row) return;
+    ev.preventDefault();
+    if (ev.target.classList.contains("to-desc")) { const q = row.querySelector(".to-qty"); if (q) q.focus(); else addItem(); }
+    else if (row === box.lastElementChild) addItem();
+    else { const n = row.nextElementSibling.querySelector(".to-desc"); if (n) n.focus(); }
+  });
   document.getElementById("toAddHeader").onclick = () => box.insertAdjacentHTML("beforeend", toLineRowHtml({ id: toNewLineId(), kind: "header" }));
 
   document.getElementById("toSave").onclick = (ev) => withBusy(ev.currentTarget, async () => {

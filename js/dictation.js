@@ -20,7 +20,10 @@ function dtAttach(root) {
     field.dataset.dtDone = "1";
     const btn = document.createElement("button");
     btn.type = "button"; btn.className = "dt-btn"; btn.textContent = "🎤"; btn.setAttribute("aria-label", "Speak");
-    field.insertAdjacentElement("afterend", btn);
+    const wrap = document.createElement("span");
+    wrap.className = "dt-wrap";
+    field.insertAdjacentElement("beforebegin", wrap);
+    wrap.appendChild(field); wrap.appendChild(btn);
     let rec = null;
     btn.onclick = () => {
       if (rec) { rec.stop(); return; }

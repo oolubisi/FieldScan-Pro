@@ -196,12 +196,13 @@ async function phMount(box, parent, label, opts) {
       <button type="button" class="ph-del" aria-label="Remove photo">×</button>${p.data.caption ? `<div class="ph-cap">${escapeHtml(p.data.caption)}</div>` : ""}</div>`).join("")}</div>
     ${photos.length ? `<p class="muted" style="font-size:12px; margin:0 0 8px;">Tap a photo to view, rotate or delete it.</p>` : ""}
     ${stages && phStageGroups(photos, stages).filled >= 2 ? `<button type="button" class="btn secondary block ph-compare" style="margin-bottom:8px;">Compare Before / During / After</button>` : ""}
-    <label class="btn secondary block ph-add">Add photo<input type="file" class="ph-file" accept="image/*" capture="environment" multiple hidden></label>
+    <div class="ph-actions"><label class="btn ph-add">📷 Add photo<input type="file" class="ph-file" accept="image/*" capture="environment" multiple hidden></label>
+      <label class="btn secondary ph-add ph-gallery">From gallery<input type="file" class="ph-file" accept="image/*" multiple hidden></label></div>
     ${photos.length ? `<label class="field"><input type="checkbox" class="ph-all"> Select all</label><button type="button" class="btn secondary block ph-save" style="margin-top:8px;">Download selected</button>
       <p class="muted" style="font-size:12px;">Photos go to this phone's Downloads. If a file with the same name is already there, Chrome keeps both and adds (1) to the new one; the browser doesn't let the app replace it.</p>` : ""}
     <div class="ph-result"></div>`;
   const fail = (m) => { box.querySelector(".ph-result").innerHTML = resultBox([m], true); };
-  box.querySelector(".ph-file").onchange = async (ev) => {
+  const onPick = async (ev) => {
     const stamp = await phStampInfo();
     for (const file of [...ev.target.files]) {
       try {
@@ -214,6 +215,7 @@ async function phMount(box, parent, label, opts) {
     }
     await phMount(box, parent, label, opts);
   };
+  box.querySelectorAll(".ph-file").forEach((i) => { i.onchange = onPick; });
   const cmp = box.querySelector(".ph-compare");
   if (cmp) cmp.onclick = () => phOpenCompare(phStageGroups(photos, stages), label);
   box.querySelectorAll(".ph-stage").forEach((sel) => {

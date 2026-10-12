@@ -7,7 +7,7 @@
  * a mix of old and new files, and a half-finished update changes nothing.
  * Files are cache-first and fully offline once installed.
  */
-const BUILD = "b20d92c4ec59";
+const BUILD = "c6d15c9ae253";
 const CACHE = "fsp-shell-" + BUILD;
 
 // Strictly JSON (double quotes, no comments): tools/stamp.js and the tests read this list.
@@ -16,6 +16,7 @@ const PRECACHE = [
   "index.html",
   "manifest.webmanifest",
   "css/app.css",
+  "css/design.css",
   "js/protocol.js",
   "js/db.js",
   "js/sync.js",

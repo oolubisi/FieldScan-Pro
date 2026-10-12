@@ -100,7 +100,7 @@ async function renderHomeScreen() {
     ${m.perProject.length ? `<div class="section-title">Projects</div>${m.perProject.map((x) => {
       const total = x.open + x.done;
       return `<div class="card proj" style="--c:${x.color}"><b>${escapeHtml(x.project.displayNumber)}</b> <span class="muted">${escapeHtml(x.project.clientName || "")}</span>
-        <div class="stats"><span><b>${x.open}</b> open</span><span><b>${x.done}</b> done</span><span><b>${x.inspections}</b> inspections</span><span><b>${x.cards}</b> take-offs</span><span><b>${x.photos}</b> photos</span></div>
+        <div class="stats"><span><b>${x.open}</b> open</span><span><b>${x.done}</b> done</span><span><b>${x.inspections}</b> inspection${x.inspections === 1 ? "" : "s"}</span><span><b>${x.cards}</b> take-off${x.cards === 1 ? "" : "s"}</span><span><b>${x.photos}</b> photo${x.photos === 1 ? "" : "s"}</span></div>
         ${total ? `<div class="bar" title="${x.done} of ${total} tasks done"><i style="width:${Math.round((x.done / total) * 100)}%"></i></div>` : ""}</div>`;
     }).join("")}` : ""}
     <div class="section-title">Recent activity</div>
