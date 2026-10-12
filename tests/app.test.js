@@ -109,6 +109,31 @@ const T0 = new Date("2026-10-05T10:00:00Z");
     console.log("Confirmed: reloading on the Sync screen stays there");
   }
 
+  section("Google Drive on the Sync screen");
+  {
+    const a = await bootApp({ hash: "#/sync" });
+    await a.waitFor(() => a.$("#driveConnect"), "the Google Drive card");
+    check(/Sync folder/.test(a.text("#main")) && a.$("#driveClientId") && a.$("#driveSecret") && a.$("#driveFolderName"), "folder card plus the Drive setup fields");
+    check(a.$("#driveFolderName").value === "FieldScanPro Sync" && /example\.test\/app\//.test(a.text("#main")), "default folder name, and the redirect address to register is shown");
+    a.setValue(a.$("#driveClientId"), "cid"); a.setValue(a.$("#driveSecret"), "sec");
+    a.w.fsp.driveAuth.beginConnect = async () => "about:blank"; // the real one navigates to Google
+    a.$("#driveConnect").click();
+    await a.waitFor(async () => (await a.w.fsp.driveAuth.status()).configured, "settings saved");
+    const st = await a.w.fsp.driveAuth.status();
+    check(st.clientId === "cid" && st.clientSecret === "sec", "the typed settings are saved");
+    const c = await a.w.fsp.driveAuth.load(); c.refreshToken = "r"; c.useDrive = true; await a.w.fsp.driveAuth.save(c);
+    a.w.fsp.folder = a.w.fsp.driveFolder;
+    a.w.location.hash = "#/home"; await a.waitFor(() => a.$("#main .hero"), "home");
+    a.w.location.hash = "#/sync";
+    await a.waitFor(() => a.$("#driveDisconnect"), "the connected Drive card");
+    check(/Sync through Google Drive/.test(a.text("#main")) && !a.$("#folderChoose") && !a.$("#driveConnect"), "connected: Drive card shown, folder chooser and setup hidden");
+    a.$("#driveDisconnect").click();
+    await a.waitFor(() => a.$("#driveConnect"), "back to setup after disconnecting");
+    check(a.w.fsp.folder === a.w.fsp.localFolder, "disconnecting returns to the local folder");
+    check(a.errors.length === 0, "no script errors: " + a.errors.join("; "));
+    console.log("Confirmed: Drive setup, connected view, disconnect");
+  }
+
   section("Calculators, on the real page");
   {
     const a = await bootApp({ hash: "#/calculators" });

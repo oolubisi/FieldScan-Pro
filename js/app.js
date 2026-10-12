@@ -152,7 +152,16 @@ async function boot() {
     fsp.db = await FSPDb.open();
     fsp.sync = FSPSync.createSync({ db: fsp.db, protocol: FSPProtocol });
     await fsp.sync.getDeviceId();
-    fsp.folder = FSPFolderSync.createFolderSync({ sync: fsp.sync, db: fsp.db, protocol: FSPProtocol });
+    fsp.localFolder = FSPFolderSync.createFolderSync({ sync: fsp.sync, db: fsp.db, protocol: FSPProtocol });
+    // Google Drive as the sync folder: no folder permission to lose. Used once it has been connected on the Sync screen.
+    fsp.driveAuth = FSPDrive.createDriveAuth({ kv: { get: fsp.db.kvGet, set: fsp.db.kvSet }, redirectUri: () => location.origin + location.pathname });
+    fsp.driveHandle = FSPDrive.createDriveFolder({ auth: fsp.driveAuth, onNeedSignIn: driveSignIn });
+    fsp.driveFolder = FSPFolderSync.createFolderSync({
+      sync: fsp.sync, db: fsp.db, protocol: FSPProtocol, metaKey: "driveSyncMeta",
+      handleStore: { get: async () => ((await fsp.driveAuth.status()).active ? fsp.driveHandle : null), set: async () => {}, clear: async () => {} },
+    });
+    fsp.folder = (await fsp.driveAuth.status()).active ? fsp.driveFolder : fsp.localFolder;
+    await driveReturn(); // back from Google's sign-in page?
     requestPersistentStorage();
     startAutoSync();
   } catch (e) {
@@ -183,6 +192,21 @@ function resultBox(lines, isError) {
   return `<div class="result-box${isError ? " error" : ""}">${lines.map((l) => `<div>${escapeHtml(l)}</div>`).join("")}</div>`;
 }
 
+/** Sends the person to Google to sign in (or sign in again). Needs a tap, which every caller has. */
+async function driveSignIn() { location.href = await fsp.driveAuth.beginConnect(); }
+
+/** Google sends the person back to the app with ?code=... in the address; finish the sign-in and tidy the address. */
+async function driveReturn() {
+  if (!/[?&](code|error)=/.test(location.search || "")) return;
+  let r = { handled: false };
+  try { r = await fsp.driveAuth.completeFromQuery(location.search); } catch (e) { r = { handled: true, ok: false, error: e.message }; }
+  if (!r.handled) return;
+  try { history.replaceState(null, "", location.pathname + "#/sync"); } catch (e) { location.hash = "#/sync"; }
+  if (r.ok) fsp.folder = fsp.driveFolder;
+  fsp.driveNotice = r.ok ? "Google Drive is connected." : r.error;
+  fsp.driveNoticeBad = !r.ok;
+}
+
 async function renderSyncScreen() {
   const main = document.getElementById("main");
   if (!fsp.sync) {
@@ -193,6 +217,7 @@ async function renderSyncScreen() {
 
   const status = await fsp.sync.getStatus();
   const folder = await fsp.folder.status();
+  const drive = await fsp.driveAuth.status();
   const canPickFolder = typeof window.showDirectoryPicker === "function";
   const projects = await fsp.sync.listProjects();
   const pings = await fsp.sync.getRecords("ping");
@@ -223,7 +248,30 @@ async function renderSyncScreen() {
     denied: "Access was refused. Tap Sync now and choose Allow, or choose the folder again.",
     error: "The folder can't be reached. Choose it again.",
   };
-  const folderCard = !canPickFolder
+  const DRIVE_STATE = { granted: "Connected. Syncing needs no permission prompts.", prompt: "Google needs you to sign in again. Tap Sync now.", none: "Not connected.", error: "Google Drive can't be reached right now." };
+  const driveCard = `<p><b>Google Drive</b> \u00b7 folder \u201c${escapeHtml(drive.folderName)}\u201d</p>
+         <p class="muted">${escapeHtml(DRIVE_STATE[folder.state] || "")}${folder.lastSync ? ` Last sync ${escapeHtml(formatWhen(folder.lastSync))}: ${escapeHtml(folder.lastSummary || "")}` : ""}</p>
+         <label style="display:flex;gap:10px;align-items:center;font-weight:600;margin:10px 0;"><input type="checkbox" id="autoSyncBox" ${asEnabled() ? "checked" : ""}> Sync automatically (every 10 minutes, on opening and on closing)</label>
+         <p class="muted" id="autoSyncNote" style="margin-top:0;">${asEnabled() ? (fsp.autoSync && fsp.autoSync.lastAt ? `Last automatic sync ${escapeHtml(formatWhen(new Date(fsp.autoSync.lastAt).toISOString()))}. ` : "") : "Automatic sync is off."}</p>
+         <button class="btn block" id="folderSync">Sync now</button>
+         <button class="btn secondary block" id="driveDisconnect" style="margin-top:8px;">Disconnect Google Drive</button>`;
+  const driveSetup = drive.active ? "" : `<div class="card">
+      <h3>Google Drive (no permission prompts)</h3>
+      <p class="muted">Syncs through a Google Drive folder instead of a folder on this phone, so Chrome never asks to allow it again. The desktop reads the same folder through Google Drive for desktop.</p>
+      <label class="field">Client ID<input id="driveClientId" autocomplete="off" value="${escapeHtml(drive.clientId)}"></label>
+      <label class="field">Client secret<input id="driveSecret" type="password" autocomplete="off" value="${escapeHtml(drive.clientSecret)}"></label>
+      <label class="field">Drive folder name<input id="driveFolderName" value="${escapeHtml(drive.folderName)}"></label>
+      <button class="btn block" id="driveConnect">Connect Google Drive</button>
+      <div id="driveResult">${fsp.driveNotice ? resultBox([fsp.driveNotice], !!fsp.driveNoticeBad) : ""}</div>
+      <details style="margin-top:10px;"><summary class="muted">How to get the Client ID and secret (once)</summary>
+        <ol class="muted" style="padding-left:18px;">
+          <li>Go to console.cloud.google.com, create a project, and turn on the <b>Google Drive API</b>.</li>
+          <li>Open <b>Google Auth Platform</b> (OAuth consent screen): choose External, add yourself as a <b>test user</b>, and add the scope <b>.../auth/drive</b>. Then press <b>Publish app</b> so the sign-in does not expire after 7 days (Google will show an \u201cunverified app\u201d notice; that is fine for your own use).</li>
+          <li>Create <b>Credentials \u2192 OAuth client ID \u2192 Web application</b>. Under <b>Authorised redirect URIs</b> add exactly:<br><b style="word-break:break-all;">${escapeHtml(drive.redirectUri)}</b></li>
+          <li>Copy the Client ID and Client secret here, then tap Connect. On the desktop, install Google Drive for desktop and choose the folder \u201c${escapeHtml(drive.folderName)}\u201d (inside My Drive) as the sync folder in Sync.</li>
+        </ol></details>
+    </div>`;
+  const folderCard = drive.active ? driveCard : !canPickFolder
     ? `<p class="muted">This browser can't open a folder directly. Use the file steps below instead.</p>`
     : folder.state === "none"
       ? `<p class="muted">Choose the folder your sync app (Syncthing) keeps in step with the desktop. After that, one tap on Sync now does everything.</p>
@@ -241,10 +289,11 @@ async function renderSyncScreen() {
 
 
     <div class="card">
-      <h3>Sync folder</h3>
+      <h3>${drive.active ? "Sync through Google Drive" : "Sync folder"}</h3>
       ${folderCard}
-      <div id="folderCardResult"></div>
+      <div id="folderCardResult">${drive.active && fsp.driveNotice ? resultBox([fsp.driveNotice], !!fsp.driveNoticeBad) : ""}</div>
     </div>
+    ${driveSetup}
 
     <div class="card">
       <h3>Project list from the desktop</h3>
@@ -304,6 +353,19 @@ async function renderSyncScreen() {
         : [r.error];
       document.getElementById("folderCardResult").innerHTML = resultBox(lines, !r.ok);
     });
+  };
+  const driveBtn = document.getElementById("driveConnect");
+  if (driveBtn) driveBtn.onclick = async (ev) => {
+    await withBusy(ev.currentTarget, async () => {
+      await fsp.driveAuth.saveSettings({ clientId: document.getElementById("driveClientId").value, clientSecret: document.getElementById("driveSecret").value, folderName: document.getElementById("driveFolderName").value });
+      try { await driveSignIn(); } catch (e) { document.getElementById("driveResult").innerHTML = resultBox([e.message], true); }
+    });
+  };
+  const driveOff = document.getElementById("driveDisconnect");
+  if (driveOff) driveOff.onclick = async () => {
+    await fsp.driveAuth.disconnect();
+    fsp.folder = fsp.localFolder; fsp.driveNotice = ""; asAllowBar(false);
+    await renderSyncScreen();
   };
   const geoBox = document.getElementById("geoStampBox");
   const fontSel = document.getElementById("fontSel"); if (fontSel) fontSel.onchange = () => fontSave(fontSel.value);

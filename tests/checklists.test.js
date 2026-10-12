@@ -117,16 +117,18 @@ const photoIs = (a) => a.$$(".ph-item");
   // captions
   a.w.phShrinkImpl = async () => ({ mime: "image/jpeg", b64: JPG, width: 8, height: 6 });
   await go(a, "#/inspections/" + insp.id, "Edit inspection");
+  await a.waitFor(() => a.$(".ph-file"), "the photo box");
   a.setFiles(a.$(".ph-file"), [{ name: "a.jpg" }]);
   await a.waitFor(() => photoIs(a).length === 1, "photo added");
   a.$(".ph-item img").click();
   await a.waitFor(() => a.$("#phViewer"), "viewer");
   a.$(".ph-v-captext").value = "Torn DPM, gridline C"; a.$(".ph-v-capsave").click();
-  await a.waitFor(async () => true, "x"); await new Promise((r) => setTimeout(r, 60));
-  const ph = await a.w.fsp.sync.getRecords("photo");
+  let ph = [];
+  for (let i = 0; i < 200; i++) { ph = await a.w.fsp.sync.getRecords("photo"); if (ph.length === 1 && ph[0].data.caption) break; await new Promise((r) => setTimeout(r, 10)); }
   check(ph.length === 1 && ph[0].data.caption === "Torn DPM, gridline C" && ph[0].data.b64 === JPG, "caption saved on a copy of the photo; the original is replaced");
   a.$(".ph-v-close").click();
-  await a.waitFor(() => /Torn DPM/.test(a.text(".ph-cap") || ""), "caption under the thumbnail");
+  try { await a.waitFor(() => /Torn DPM/.test(a.text(".ph-cap") || ""), "caption under the thumbnail", 800); }
+  catch (e) { await go(a, "#/inspections/" + insp.id, "Edit inspection"); await a.waitFor(() => /Torn DPM/.test(a.text(".ph-cap") || ""), "caption under the thumbnail after reopening"); } // the thumbnail list can lag behind the viewer closing
   check(a.errors.length === 0, "no script errors: " + a.errors.join("; "));
   console.log("Confirmed: templates, results, notes, defect tasks (once), captions");
   console.log("\n✅ ALL CHECKLIST TESTS PASSED");

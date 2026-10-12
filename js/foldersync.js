@@ -29,7 +29,7 @@
 
   const errText = (e) => `${(e && e.name) || "Error"}${e && e.message ? ": " + e.message : ""}`;
 
-  function createFolderSync({ sync, db, protocol, now, handleStore }) {
+  function createFolderSync({ sync, db, protocol, now, handleStore, metaKey }) {
     const P = protocol;
     const clock = now || (() => new Date());
     // Folder handles can only be kept in IndexedDB; the store is injectable so the
@@ -43,8 +43,8 @@
     };
     let running = null;
 
-    const loadMeta = () => db.kvGet(META_KEY, { processed: {}, lastSync: null, lastSummary: "" });
-    const saveMeta = (m) => db.kvSet(META_KEY, m);
+    const loadMeta = () => db.kvGet(metaKey || META_KEY, { processed: {}, lastSync: null, lastSummary: "" });
+    const saveMeta = (m) => db.kvSet(metaKey || META_KEY, m);
 
     // ---------- choosing and checking the folder ----------
 

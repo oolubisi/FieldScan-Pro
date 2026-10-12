@@ -187,9 +187,11 @@ async function phOpenViewer(parent, label, startIndex, onClose) {
 async function phMount(box, parent, label, opts) {
   if (!box) return;
   if (typeof vnMount === "function") vnMount(box, parent, label);
+  const seq = box._phSeq = (box._phSeq || 0) + 1; // two redraws in flight: only the newest may draw, so an older, slower one can't put stale photos back
   const stages = opts && opts.stages ? ((await fsp.sync.getRecords(parent.type)).find((r) => r.id === parent.id) || parent).data.photoStages || {} : null;
   const photos = (await fsp.sync.getRecords("photo")).filter((r) => r.data.parentId === parent.id)
     .sort((a, b) => String(a.data.takenAt || "").localeCompare(String(b.data.takenAt || "")));
+  if (box._phSeq !== seq) return;
   box.innerHTML = `<h3>Photos${photos.length ? ` (${photos.length})` : ""}</h3>
     <div class="ph-grid">${photos.map((p) => `<div class="ph-item" data-id="${escapeHtml(p.id)}">
       <img src="data:${escapeHtml(p.data.mime)};base64,${p.data.b64}" alt="Photo">
@@ -233,7 +235,7 @@ async function phMount(box, parent, label, opts) {
     box.querySelector(".ph-result").innerHTML = resultBox([`${items.length} photo${items.length === 1 ? "" : "s"} saved to this phone's Downloads.`]);
   };
   box.querySelectorAll(".ph-item img").forEach((img) => {
-    img.onclick = () => phOpenViewer(parent, label, photos.findIndex((p) => p.id === img.closest(".ph-item").dataset.id), () => phMount(box, parent, label, opts));
+    img.onclick = () => phOpenViewer(parent, label, photos.findIndex((p) => p.id === img.closest(".ph-item").dataset.id), () => phMount(box.isConnected ? box : ((box.id && document.getElementById(box.id)) || box), parent, label, opts)); // the screen may have redrawn while the viewer was open
   });
   box.querySelectorAll(".ph-del").forEach((b) => {
     b.onclick = async () => { await fsp.sync.deleteRecord(b.closest(".ph-item").dataset.id); await phMount(box, parent, label, opts); };
