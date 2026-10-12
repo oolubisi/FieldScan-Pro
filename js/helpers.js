@@ -65,5 +65,7 @@ function coSet(key) { try { if (key) localStorage.setItem(CO_STORE, key); else l
 function coFilter(list) { const c = coCurrent(); return c ? list.filter((x) => x.companyKey === c) : list; }
 /** The companies the forms may offer: just the current one when a company is chosen. */
 /** Projects still in progress: drops handed-over ones, except `keepId` (a record being edited keeps its project). */
+// true when a record belongs to a project that has been handed over (hidden from lists)
+function pjGone(projects, r) { return !!r.projectId && projects.some((p) => p.id === r.projectId && p.companyKey === r.companyKey && p.handedOver); }
 function pjLive(list, keepId) { return list.filter((p) => !p.handedOver || p.id === keepId); }
 function coCompanies(list) { const c = coCurrent(); return c ? list.filter((x) => x.key === c) : list; }

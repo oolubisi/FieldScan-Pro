@@ -30,7 +30,7 @@ const exStatusBadge = (s) => ({ added: ["ok", "On the desktop ✓"], dismissed: 
 async function renderExpenseList() {
   const main = document.getElementById("main");
   const m = await exLoad();
-  const items = [...m.items].sort((a, b) => String(b.data.date || "").localeCompare(String(a.data.date || "")) || (a.updatedAt < b.updatedAt ? 1 : -1));
+  const items = m.items.filter((r) => !pjGone(m.projects, r)).sort((a, b) => String(b.data.date || "").localeCompare(String(a.data.date || "")) || (a.updatedAt < b.updatedAt ? 1 : -1));
   const month = exToday().slice(0, 7);
   const thisMonth = items.filter((r) => String(r.data.date || "").startsWith(month)).reduce((t, r) => t + (Number(r.data.amount) || 0), 0);
   main.innerHTML = `<h2>Expenses</h2>

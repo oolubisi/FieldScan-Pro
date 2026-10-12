@@ -77,7 +77,7 @@ async function renderTaskList() {
   const m = await tsLoad();
   const filter = renderTaskList.filter || "all";
   const lastCompany = renderTaskList.company && m.companies.some((c) => c.key === renderTaskList.company) ? renderTaskList.company : (m.companies[0] || {}).key;
-  const shown = m.tasks.filter((t) => filter === "all" || (filter === "none" ? !t.projectId : `${t.companyKey}:${t.projectId}` === filter));
+  const shown = m.tasks.filter((t) => !pjGone(m.projects, t)).filter((t) => filter === "all" || (filter === "none" ? !t.projectId : `${t.companyKey}:${t.projectId}` === filter));
   const dueOnly = renderTaskList.due === "overdue";
   const open = shown.filter((t) => t.data.status !== "Done" && (!dueOnly || tsDueStatus(t.data.dueDate) === "overdue"))
     .sort((a, b) => (a.data.dueDate || "9999").localeCompare(b.data.dueDate || "9999") || tsOrder(b) - tsOrder(a));

@@ -114,7 +114,7 @@ async function renderTakeoffGroups() {
   const main = document.getElementById("main");
   const model = await toLoad();
   const filter = renderTakeoffGroups.filter || "all";
-  const shown = model.groups.filter((g) => filter === "all" || `${g.companyKey}:${g.projectId}` === filter);
+  const shown = model.groups.filter((g) => !pjGone(model.projects, g)).filter((g) => filter === "all" || `${g.companyKey}:${g.projectId}` === filter);
   const projectOptions = `<option value="all">All projects</option>` + pjLive(model.projects).map((p) => `<option value="${escapeHtml(p.key)}" ${p.key === filter ? "selected" : ""}>${escapeHtml(toProjectLabel(p))}</option>`).join("");
 
   main.innerHTML = `

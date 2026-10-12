@@ -27,7 +27,7 @@ async function renderDiaryList() {
   const main = document.getElementById("main");
   const m = await dyLoad();
   const filter = renderDiaryList.filter || "all";
-  const shown = m.items.filter((r) => filter === "all" || (filter === "none" ? !r.projectId : `${r.companyKey}:${r.projectId}` === filter))
+  const shown = m.items.filter((r) => !pjGone(m.projects, r)).filter((r) => filter === "all" || (filter === "none" ? !r.projectId : `${r.companyKey}:${r.projectId}` === filter))
     .sort((a, b) => String(b.data.date || "").localeCompare(String(a.data.date || "")) || (a.updatedAt < b.updatedAt ? 1 : -1));
   main.innerHTML = `
     <h2>Site diary</h2>
