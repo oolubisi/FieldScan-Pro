@@ -113,6 +113,11 @@ const JPG = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhc
   check(info.lat === undefined && /^\d+ \w+ 2026/.test(info.text), "no location: time only, photo still taken");
   w.phStampEnabled(false); check((await w.phStampInfo()) === null, "off means no stamp"); w.phStampEnabled(true);
   await go(a, "#/sync", "Sync");
+  check(a.$("#fontSel") && a.$("#fontSel").value === "default", "text size setting is on the Sync screen");
+  a.$("#fontSel").value = "large"; a.event(a.$("#fontSel"), "change");
+  check(w.document.documentElement.style.zoom === "1.15" && w.localStorage.getItem("fsp-font") === "large", "text size is applied and saved");
+  a.$("#fontSel").value = "default"; a.event(a.$("#fontSel"), "change");
+  check(w.document.documentElement.style.zoom === "", "default removes the zoom");
   check(a.$("#geoStampBox") && a.$("#geoStampBox").checked, "setting is on the Sync screen");
   a.$("#geoStampBox").checked = false; a.event(a.$("#geoStampBox"), "change"); check(w.phStampEnabled() === false, "turning it off is remembered"); w.phStampEnabled(true);
 

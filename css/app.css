@@ -321,3 +321,4 @@ input, select, textarea { color: var(--text); }
 .vn-dot { width: 12px; height: 12px; border-radius: 50%; background: #dc2626; animation: vnpulse 1s infinite; }
 @keyframes vnpulse { 50% { opacity: .25; } }
 .vn-tx { margin: 0; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.modal-box { max-height: calc(88vh / var(--ui-zoom, 1)); }

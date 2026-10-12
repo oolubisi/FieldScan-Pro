@@ -144,6 +144,7 @@ function setupMenu() {
 async function boot() {
   setupMenu();
   setupTheme();
+  fontApply(fontGet());
   setupLock();
   registerServiceWorker();
   try {
@@ -283,6 +284,8 @@ async function renderSyncScreen() {
     <div class="card">
       <h3>This phone</h3>
       <p class="muted">Device ID <b>${escapeHtml(status.deviceId)}</b> \u00b7 App version ${escapeHtml(APP_VERSION)}</p>
+      <label class="field">Text size<select id="fontSel">${Object.entries(FONT_SIZES).map(([k, v]) => `<option value="${k}" ${k === fontGet() ? "selected" : ""}>${v[0]}</option>`).join("")}</select></label>
+      <p class="muted" style="margin-top:-4px;">Makes everything on screen bigger or smaller. Printed reports are not affected.</p>
       <label style="display:flex;gap:10px;align-items:center;font-weight:600;margin:6px 0 10px;"><input type="checkbox" id="geoStampBox" ${phStampEnabled() ? "checked" : ""}> Stamp photos with date, time and GPS location</label>
       <a class="btn secondary block" href="#/help" style="text-align:center; text-decoration:none; margin-bottom:8px;">Help</a>
       <a class="btn secondary block" href="#/safety" style="text-align:center; text-decoration:none; margin-bottom:8px;">Backup, storage, lock &amp; history</a>
@@ -302,6 +305,7 @@ async function renderSyncScreen() {
     });
   };
   const geoBox = document.getElementById("geoStampBox");
+  const fontSel = document.getElementById("fontSel"); if (fontSel) fontSel.onchange = () => fontSave(fontSel.value);
   if (geoBox) geoBox.onchange = () => { phStampEnabled(geoBox.checked); showStatus(geoBox.checked ? "New photos will carry the date, time and location." : "New photos will not be stamped."); };
   const autoBox = document.getElementById("autoSyncBox");
   if (autoBox) autoBox.onchange = () => { asEnabled(autoBox.checked); if (autoBox.checked && fsp.autoSync) fsp.autoSync.tick(true); renderSyncScreen(); };

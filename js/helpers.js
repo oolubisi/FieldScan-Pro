@@ -67,5 +67,14 @@ function coFilter(list) { const c = coCurrent(); return c ? list.filter((x) => x
 /** Projects still in progress: drops handed-over ones, except `keepId` (a record being edited keeps its project). */
 // true when a record belongs to a project that has been handed over (hidden from lists)
 function pjGone(projects, r) { return !!r.projectId && projects.some((p) => p.id === r.projectId && p.companyKey === r.companyKey && p.handedOver); }
+// ----- text size: the whole interface scales (CSS zoom on the page) -----
+const FONT_SIZES = { small: ["Small", 0.9], default: ["Default", 1], large: ["Large", 1.15], xlarge: ["Extra large", 1.3] };
+function fontGet() { try { const v = localStorage.getItem("fsp-font"); return FONT_SIZES[v] ? v : "default"; } catch (e) { return "default"; } }
+function fontApply(key) {
+  const f = (FONT_SIZES[key] || FONT_SIZES.default)[1];
+  document.documentElement.style.zoom = f === 1 ? "" : String(f);
+  document.documentElement.style.setProperty("--ui-zoom", String(f));
+}
+function fontSave(key) { try { localStorage.setItem("fsp-font", key); } catch (e) { /* not saved */ } fontApply(key); }
 function pjLive(list, keepId) { return list.filter((p) => !p.handedOver || p.id === keepId); }
 function coCompanies(list) { const c = coCurrent(); return c ? list.filter((x) => x.key === c) : list; }
