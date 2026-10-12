@@ -77,7 +77,7 @@
 
     /** Remembers a record's PREVIOUS content so a change can be undone. Photos are too big to keep and are skipped. */
     async function logHistory(prev, source, newData) {
-      if (!prev || prev.type === "photo" || prev.type === "ping") return;
+      if (!prev || prev.type === "photo" || prev.type === "voice" || prev.type === "ping") return;
       const list = await db.kvGet("history", []);
       list.unshift({
         n: newRecordId(), recId: prev.id, type: prev.type, at: clock().toISOString(), source,
@@ -154,8 +154,8 @@
         return { ops: [{ op: "put", store: "records", value: next }], result: next };
       });
       // a record's photos go with it
-      if (result.type !== "photo") {
-        for (const ph of (await getRecords("photo")).filter((p) => p.data.parentId === id)) await deleteRecord(ph.id);
+      if (result.type !== "photo" && result.type !== "voice") {
+        for (const t of ["photo", "voice"]) for (const ph of (await getRecords(t)).filter((p) => p.data.parentId === id)) await deleteRecord(ph.id);
       }
       return result;
     }
@@ -220,7 +220,7 @@
 
     /** Applies one incoming record version, atomically. Returns what happened. */
     async function applyEnvelope(env) {
-      const local = env.type === "photo" ? null : await db.get("records", env.id);
+      const local = env.type === "photo" || env.type === "voice" ? null : await db.get("records", env.id);
       const action = await applyEnvelopeNow(env);
       if (action === "apply" && local && !local.deleted && (env.deleted || JSON.stringify(local.data) !== JSON.stringify(env.data))) {
         await logHistory(local, "desktop", env.data);

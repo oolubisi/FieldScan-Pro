@@ -186,6 +186,7 @@ async function phOpenViewer(parent, label, startIndex, onClose) {
 
 async function phMount(box, parent, label, opts) {
   if (!box) return;
+  if (typeof vnMount === "function") vnMount(box, parent, label);
   const stages = opts && opts.stages ? ((await fsp.sync.getRecords(parent.type)).find((r) => r.id === parent.id) || parent).data.photoStages || {} : null;
   const photos = (await fsp.sync.getRecords("photo")).filter((r) => r.data.parentId === parent.id)
     .sort((a, b) => String(a.data.takenAt || "").localeCompare(String(b.data.takenAt || "")));

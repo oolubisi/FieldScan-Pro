@@ -307,3 +307,16 @@ input, select, textarea { color: var(--text); }
 .ph-item .ph-cap { max-width: none; }
 /* empty states */
 .empty-state { padding: 28px 20px; border: 1px dashed var(--line); background: transparent; box-shadow: none; }
+
+/* voice notes */
+.vn-box { margin: 14px 0; }
+.vn-row { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--line2, #e3e6ea); }
+.vn-row audio { width: 100%; height: 40px; }
+.vn-meta { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--sub, #5b6572); }
+.vn-rec { margin-top: 8px; }
+.vn-rec .vn-start { width: 100%; }
+.vn-live { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #fca5a5; background: #fef2f2; border-radius: 10px; }
+.vn-live[hidden] { display: none; }
+.vn-time { font-variant-numeric: tabular-nums; font-size: 18px; flex: 1; }
+.vn-dot { width: 12px; height: 12px; border-radius: 50%; background: #dc2626; animation: vnpulse 1s infinite; }
+@keyframes vnpulse { 50% { opacity: .25; } }
