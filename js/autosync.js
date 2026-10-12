@@ -58,7 +58,7 @@ function asAllowBar(show) {
   if (bar) return;
   bar = document.createElement("button");
   bar.id = "allowBar"; bar.type = "button"; bar.className = "allow-bar";
-  bar.innerHTML = `<b>Sync is waiting</b><span>Tap here, then choose <b>Allow</b> (or “Allow on every visit”) so this phone can sync.</span>`;
+  bar.innerHTML = `<b>Sync is waiting</b><span>Tap here, then choose <b>Allow</b> so this phone can sync.</span>`;
   bar.onclick = async () => {
     bar.disabled = true;
     let r;

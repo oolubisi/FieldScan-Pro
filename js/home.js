@@ -93,7 +93,7 @@ async function renderHomeScreen() {
       <a class="tile" href="#/tasks" style="--c:#16a34a"><div class="ring" style="--p:${m.pct}"><span>${m.pct}%</span></div><div><div class="num">${m.openTasks}</div><div class="lbl">Open tasks</div></div></a>
       ${tile("#/inspections", m.inspectionsThisMonth, "Inspections this month", "#7c3aed", "🔍")}
       ${tile("#/takeoff", m.cards, "Take-off cards", "#d97706", "📐")}
-      ${tile("#/inspections", m.photos, "Photos", "#0891b2", "📷")}
+      ${tile("#/photos", m.photos, "Photos", "#0891b2", "📷")}
       ${tile("#/diary", m.diaryThisMonth, "Diary entries", "#be185d", "📒")}
       ${tile("#/expenses", m.expensesThisMonth, "Expenses this month", "#0d9488", "🧾")}
     </div>
