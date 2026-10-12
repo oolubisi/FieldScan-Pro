@@ -146,7 +146,6 @@ function pdfBuild({ title, blocks, footer }) {
   obj(3, [`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`]);
   obj(4, [`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>`]);
   pageObjs.forEach(({ pg, pid, cid, imgIds }, pi) => {
-    const foot = [];
     const save = page; page = pg; // draw the page footer onto this page
     const label = pdfWin(`${footer || ""}${footer ? "   ·   " : ""}Page ${pi + 1} of ${total}`);
     text(label, PDF_W - PDF_M - pdfTextW(label, 8, false), 24, 8, false, 0.45);
