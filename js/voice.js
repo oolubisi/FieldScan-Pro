@@ -50,6 +50,7 @@ async function vnRender(box, parent, label) {
   box.innerHTML = `<h3>Voice notes${notes.length ? ` (${notes.length})` : ""}</h3>
     ${notes.map((n) => `<div class="vn-row" data-id="${escapeHtml(n.id)}">
       <audio controls preload="none" src="data:${escapeHtml(n.data.mime)};base64,${n.data.b64}"></audio>
+      ${n.data.transcript ? `<p class="vn-tx">${escapeHtml(n.data.transcript)}</p>` : ""}
       <div class="vn-meta"><span>${escapeHtml(vnFmt(n.data.durationSec))} · ${escapeHtml(new Date(n.data.takenAt).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}</span>
         <button type="button" class="btn secondary small vn-del">Delete</button></div></div>`).join("")}
     ${vnSupported() ? `<div class="vn-rec"><button type="button" class="btn vn-start">🎙 Record voice note</button>
