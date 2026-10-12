@@ -4,7 +4,7 @@ const { JSDOM } = require("jsdom");
 function check(c, m) { if (!c) { console.error("FAIL: " + m); process.exit(1); } }
 const dom = new JSDOM("<body></body>", { runScripts: "outside-only", url: "http://localhost/" });
 const w = dom.window;
-w.eval(fs.readFileSync(__dirname + "/../js/autosync.js", "utf8") + "\nwindow.createAutoSync = createAutoSync; window.asEnabled = asEnabled;");
+w.eval(fs.readFileSync(__dirname + "/../js/autosync.js", "utf8") + "\nwindow.createAutoSync = createAutoSync; window.asEnabled = asEnabled; window.asAllowBar = asAllowBar;");
 console.log("=== Automatic sync ===");
 (async () => {
   let t = 1000, calls = [], on = true, shown = true, results = [];
@@ -39,5 +39,14 @@ console.log("=== Automatic sync ===");
   check(br.ok === false && /boom/.test(br.error), "a failure is reported, not thrown");
   check(w.asEnabled() === true && w.asEnabled(false) === false && w.asEnabled() === false, "on by default, switch remembered");
   console.log("Confirmed: 10-minute timing, visibility, on/off, no overlap, failures contained");
+  // the "Sync is waiting" bar (Chrome forgot the folder permission): stays until tapped, and the tap does the sync
+  let tapped = 0; w.fsp = { folder: { syncNow: async (o) => { tapped++; return { ok: true }; } } }; w.showStatus = () => {};
+  w.asAllowBar(true); w.asAllowBar(true);
+  check(w.document.querySelectorAll("#allowBar").length === 1, "one bar, not a stack of them");
+  w.document.getElementById("allowBar").click();
+  await new Promise((r) => setTimeout(r, 20));
+  check(tapped === 1 && !w.document.getElementById("allowBar"), "tapping it syncs (with the tap Chrome needs) and clears the bar");
+  w.asAllowBar(true); w.asAllowBar(false);
+  check(!w.document.getElementById("allowBar"), "it can be cleared when sync works again");
   console.log("\n✅ ALL AUTO SYNC TESTS PASSED");
 })();

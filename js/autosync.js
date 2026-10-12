@@ -48,6 +48,28 @@ function createAutoSync({ syncNow, enabled, visible, now, onResult, intervalMs }
   return { start, tick, lastRun: () => last };
 }
 
+/**
+ * Chrome forgets the folder permission between visits and only lets it be asked for with a tap. So instead of a red
+ * message that disappears, a calm bar stays until the person taps it; that tap is the gesture Chrome needs.
+ */
+function asAllowBar(show) {
+  let bar = document.getElementById("allowBar");
+  if (!show) { if (bar) bar.remove(); return; }
+  if (bar) return;
+  bar = document.createElement("button");
+  bar.id = "allowBar"; bar.type = "button"; bar.className = "allow-bar";
+  bar.innerHTML = `<b>Sync is waiting</b><span>Tap here, then choose <b>Allow</b> (or “Allow on every visit”) so this phone can sync.</span>`;
+  bar.onclick = async () => {
+    bar.disabled = true;
+    let r;
+    try { r = await fsp.folder.syncNow({}); } catch (e) { r = { ok: false, error: e.message }; }
+    bar.disabled = false;
+    if (r && r.ok) { asAllowBar(false); showStatus("Synced."); if (typeof navigate === "function") navigate(); }
+    else if (r && r.error) showStatus(r.error, true);
+  };
+  document.body.appendChild(bar);
+}
+
 /** Wires it into the real app. */
 function startAutoSync() {
   if (!window.fsp || !fsp.folder) return null;
@@ -58,7 +80,8 @@ function startAutoSync() {
       fsp.autoSync.lastAt = Date.now(); fsp.autoSync.last = r;
       const got = r && r.ok ? (r.applied || 0) : 0;
       if (got) showStatus(`Auto-sync: ${got} update${got === 1 ? "" : "s"} received.`);
-      else if (r && !r.ok && r.code === "permission") showStatus(r.error, true);
+      if (r && r.ok) asAllowBar(false);
+      else if (r && !r.ok && r.code === "permission") asAllowBar(true);
       if ((got && /^#\/(home|sync)?$/.test(location.hash)) || (r && r.ok && /^#\/(home)?$/.test(location.hash))) navigate(); // refresh screens with nothing being typed
     },
   });

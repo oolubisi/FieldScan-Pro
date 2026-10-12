@@ -322,3 +322,9 @@ input, select, textarea { color: var(--text); }
 @keyframes vnpulse { 50% { opacity: .25; } }
 .vn-tx { margin: 0; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
 .modal-box { max-height: calc(88vh / var(--ui-zoom, 1)); }
+
+/* sync permission bar */
+.allow-bar { position: fixed; left: 12px; right: 12px; bottom: calc(68px + env(safe-area-inset-bottom)); z-index: 40; display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 12px 14px; border: 0; border-radius: 14px; background: #1d4ed8; color: #fff; font: inherit; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.allow-bar b { font-size: 15px; }
+.allow-bar span { font-size: 13px; opacity: .95; }
+.allow-bar:disabled { opacity: .7; }
