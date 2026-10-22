@@ -54,12 +54,40 @@ const PRECACHE = [
 
 const SHELL = new URL("index.html", self.registration.scope).href;
 
+/**
+ * Fetches one precache URL, retrying a couple of times on a flaky connection
+ * before giving up on it. Plain cache.addAll() has no retry at all: on a real
+ * mobile connection, a single file timing out once aborts the ENTIRE install,
+ * which on a phone's very first install (no earlier version to fall back to)
+ * leaves it with nothing cached and unable to work offline at all. The install
+ * as a whole is still all-or-nothing -- see below -- this just makes each
+ * individual file's fetch resilient to a one-off hiccup before that applies.
+ */
+async function fetchOne(url, attempt = 1) {
+  const req = new Request(url, { cache: "reload" });
+  try {
+    const res = await fetch(req);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return [req, res];
+  } catch (e) {
+    if (attempt < 3) {
+      await new Promise((r) => setTimeout(r, 300 * attempt));
+      return fetchOne(url, attempt + 1);
+    }
+    throw e;
+  }
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE)
-      // cache: "reload" bypasses the browser's HTTP cache, so a new release can't
-      // precache a stale copy of a file that was changed a few minutes ago.
-      .then((cache) => cache.addAll(PRECACHE.map((u) => new Request(u, { cache: "reload" }))))
+    Promise.all(PRECACHE.map((u) => fetchOne(u)))
+      // Only once every file is actually in hand do we touch the cache, so a release
+      // that still fails after retries changes nothing -- the previous version, if
+      // any, stays in control exactly as before.
+      .then(async (pairs) => {
+        const cache = await caches.open(CACHE);
+        await Promise.all(pairs.map(([req, res]) => cache.put(req, res)));
+      })
       .then(() => self.skipWaiting()),
   );
 });
