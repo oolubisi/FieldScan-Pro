@@ -54,27 +54,43 @@ const PRECACHE = [
 
 const SHELL = new URL("index.html", self.registration.scope).href;
 
+const FETCH_ATTEMPTS = 5; // was 3 -- a flaky/throttled ISP needs more room than a quick home-wifi hiccup
+const FETCH_TIMEOUT_MS = 15000; // a stalled request (common on bad mobile links) must be treated as a failure, not hang forever
+
 /**
- * Fetches one precache URL, retrying a couple of times on a flaky connection
+ * Fetches one precache URL, retrying several times on a flaky connection
  * before giving up on it. Plain cache.addAll() has no retry at all: on a real
  * mobile connection, a single file timing out once aborts the ENTIRE install,
  * which on a phone's very first install (no earlier version to fall back to)
  * leaves it with nothing cached and unable to work offline at all. The install
  * as a whole is still all-or-nothing -- see below -- this just makes each
- * individual file's fetch resilient to a one-off hiccup before that applies.
+ * individual file's fetch resilient to the kind of slow/dropped connection a
+ * weaker ISP or mobile network produces, before that applies.
+ *
+ * Each attempt is also bounded by a timeout: some networks don't error out on
+ * a bad request, they just never respond, and an un-timed-out fetch() would
+ * sit there forever -- never retrying, never failing, install stuck for good.
  */
 async function fetchOne(url, attempt = 1) {
   const req = new Request(url, { cache: "reload" });
+  let timer;
   try {
-    const res = await fetch(req);
+    const res = await Promise.race([
+      fetch(req),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("timed out")), FETCH_TIMEOUT_MS); }),
+    ]);
     if (!res.ok) throw new Error("HTTP " + res.status);
     return [req, res];
   } catch (e) {
-    if (attempt < 3) {
-      await new Promise((r) => setTimeout(r, 300 * attempt));
+    if (attempt < FETCH_ATTEMPTS) {
+      // Exponential backoff (capped) -- a struggling connection needs more breathing
+      // room between tries than a merely unlucky one-off drop.
+      await new Promise((r) => setTimeout(r, Math.min(400 * 2 ** (attempt - 1), 3000)));
       return fetchOne(url, attempt + 1);
     }
     throw e;
+  } finally {
+    clearTimeout(timer); // whichever side of the race won, the other must not linger
   }
 }
 

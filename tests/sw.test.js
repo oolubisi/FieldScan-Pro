@@ -42,6 +42,12 @@ function fakeFetchFor(network) {
   return async (req) => {
     network.requests.push({ url: req.url, cache: req.cache });
     if (!network.online) throw new TypeError("Failed to fetch");
+    // A struggling connection that drops a specific URL's first N attempts, then
+    // recovers -- simulates the flaky-ISP case the retry/backoff logic exists for.
+    if (network.flaky && network.flaky[req.url] > 0) {
+      network.flaky[req.url]--;
+      throw new TypeError("Failed to fetch");
+    }
     const body = network.files[req.url];
     return body === undefined ? new Response("not found", { status: 404 }) : new Response(body, { status: 200 });
   };
@@ -60,7 +66,12 @@ function loadServiceWorker({ network, caches, build }) {
   // relative URLs resolve against the worker's own address, as in a real browser
   const RelativeRequest = function (input, init) { return new Request(new URL(input, BASE + "sw.js").href, init); };
   const source = build ? SW_SOURCE.replace(/const BUILD = "[0-9a-f]{12}";/, `const BUILD = "${build}";`) : SW_SOURCE;
-  vm.runInNewContext(source, { self, caches, fetch: fakeFetchFor(network), Request: RelativeRequest, Response, URL, Promise, console });
+  // setTimeout/clearTimeout are WHATWG/Node globals, not part of the bare JS
+  // language, so a vm sandbox doesn't get them for free -- without these, every
+  // retry backoff in sw.js throws "setTimeout is not defined" immediately
+  // instead of actually waiting and retrying, which would let these tests pass
+  // without ever exercising the retry logic at all.
+  vm.runInNewContext(source, { self, caches, fetch: fakeFetchFor(network), Request: RelativeRequest, Response, URL, Promise, console, setTimeout, clearTimeout });
   const dispatch = async (type, event) => {
     let pending = Promise.resolve();
     event.waitUntil = (p) => { pending = p; };
@@ -118,6 +129,22 @@ const get = (url) => ({ method: "GET", url, mode: "cors", headers: new Headers()
     check(cache.map.size === 0, "and no half-installed set is left behind");
     check(sw.calls.skipWaiting === 0, "the broken release never takes over");
     console.log("Confirmed: a missing file means the update is refused, with nothing half-cached");
+  }
+
+  section("Install: survives a connection flaky enough to drop a file's first few attempts");
+  {
+    // This is exactly the install-fails-on-a-weak-ISP bug: one file drops 3 times
+    // in a row (more than the old 3-attempt limit could survive) before the
+    // connection recovers on the 4th try. With only 5 attempts and backoff this
+    // must still succeed instead of aborting the whole install.
+    const network = { online: true, files: siteFiles(), requests: [], flaky: { [abs("js/app.js")]: 3 } };
+    const caches = makeCaches(network);
+    const sw = loadServiceWorker({ network, caches });
+    await sw.install(); // must not throw
+    const cache = await caches.open("fsp-shell-" + buildOf);
+    check(cache.map.size === PRECACHE.length, `all ${PRECACHE.length} files cached despite the flaky file, got ${cache.map.size}`);
+    check(sw.calls.skipWaiting === 1, "a release that eventually succeeds still takes over");
+    console.log("Confirmed: three dropped attempts on one file no longer sink the whole install");
   }
 
   section("Serving: works completely offline");
