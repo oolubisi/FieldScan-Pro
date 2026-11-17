@@ -88,7 +88,7 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
   section("Progress");
   await go(a, "#/projects/" + KEY, "PRJ/26/001 — Acme");
-  check(a.$$(".pj-tabs a").map((x) => x.textContent).join() === "Progress,Snags,Photos,Tasks,Inspections,Take-off,Diary", "seven sub-tabs");
+  check(a.$$(".pj-tabs a").map((x) => x.textContent).join() === "Progress,Snags,Photos,Payments,Tasks,Inspections,Take-off,Diary", "eight sub-tabs, including read-only Payments");
   await a.waitFor(() => a.$("#pjNewProgress"), "progress tab");
   a.$("#pjNewProgress").click();
   await a.waitFor(() => a.$("#pgTitle"), "form");
@@ -152,6 +152,33 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
   await go(a, "#/projects/" + KEY + "/tasks", "PRJ/26/001 — Acme");
   await a.waitFor(() => /Order sand/.test(a.text("#pjBody")), "task listed");
   check(a.$$(".pj-tabs a.active")[0].dataset.tab === "tasks", "active sub-tab");
+
+  section("Payments (read-only, straight off the desktop's project list)");
+  await go(a, "#/projects/" + KEY + "/payments", "PRJ/26/001 — Acme");
+  await a.waitFor(() => /No payments on this project yet/.test(a.text("#pjBody")), "empty state");
+  // the desktop re-publishes the project list with payments attached
+  await a.w.fsp.sync.importFiles([file("p2.json", P.makeProjectsSnapshot({
+    origin: DT, company: { key: CO, name: "PI Projects" }, now: new Date("2026-10-06T10:00:00Z"),
+    projects: [{ id: "p1", displayNumber: "PRJ/26/001", clientName: "Acme", siteLocation: "Lekki", status: "Active",
+      payments: [
+        { payee: "Pepper Ltd", direction: "Outgoing Payment", category: "Materials", totalInvoice: 1000000, paid: 400000, balance: 600000,
+          stages: [{ stage: "1", date: "2026-10-01", amount: 400000, method: "Transfer", status: "", bank: "GTBank", sender: "Kayode", narration: "Blocks" }] },
+        { payee: "Acme", direction: "Client Receipt", category: "", totalInvoice: 2000000, paid: 2000000, balance: 0,
+          stages: [{ stage: "1", date: "2026-09-20", amount: 2000000, method: "Transfer", status: "", bank: "", sender: "", narration: "" }] },
+      ] }],
+  }))]);
+  await go(a, "#/projects", "Projects"); await go(a, "#/projects/" + KEY + "/payments", "PRJ/26/001 — Acme");
+  await a.waitFor(() => /Pepper Ltd/.test(a.text("#pjBody")), "payments listed");
+  const payText = a.text("#pjBody");
+  check(/₦400,000\.00/.test(payText) && /₦600,000\.00/.test(payText), "stage amount and balance shown: " + payText.slice(0, 120));
+  check(/Part paid/.test(payText), "outstanding invoice marked part paid");
+  check(/Complete/.test(payText), "fully-paid client receipt marked complete");
+  check(/GTBank/.test(payText) && /Blocks/.test(payText), "payment source details carried to the phone");
+  check(/₦2,000,000\.00/.test(payText), "client receipt total shown");
+  // the point of the whole tab: nothing here can write a payment back
+  check(a.$$("#pjBody input, #pjBody button, #pjBody textarea, #pjBody select").length === 0, "read-only: no inputs or buttons in the payments tab");
+  check((await a.w.fsp.sync.getRecords("payment")).length === 0, "phone holds no writable payment records to sync back");
+
   check(a.errors.length === 0, "no page errors: " + a.errors);
   console.log("\n✅ ALL PROJECTS TESTS PASSED");
   process.exit(0);

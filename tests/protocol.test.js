@@ -77,6 +77,23 @@ check(!P.validateProjectsSnapshot({ ...snap, company: { key: "bad key", name: "x
 check(!P.validateProjectsSnapshot({ ...snap, kind: "bundle" }).ok && !P.validateProjectsSnapshot({ ...snap, fsp: 2 }).ok, "wrong kind / newer format refused");
 console.log("Confirmed: snapshot validation");
 
+section("Read-only payments riding with the project list");
+const payProject = { id: "p9", displayNumber: "PRJ/26/009", clientName: "Acme",
+  payments: [{ payee: "Pepper Ltd", direction: "Outgoing Payment", category: "Materials", totalInvoice: 1000000, paid: 400000, balance: 600000,
+    stages: [{ stage: "1", date: "2026-10-01", amount: 400000, method: "Transfer", status: "", bank: "GTBank", sender: "Kayode", narration: "Blocks" }] }] };
+const paySnap = P.validateProjectsSnapshot(P.makeProjectsSnapshot({ origin: DT, company: { key: "co-12345678-aaaa", name: "PI Projects" }, projects: [payProject], now: new Date("2026-10-05T10:00:00Z") }));
+check(paySnap.ok && paySnap.projects[0].payments.length === 1, "payments carried through");
+const pg = paySnap.projects[0].payments[0];
+check(pg.payee === "Pepper Ltd" && pg.totalInvoice === 1000000 && pg.paid === 400000 && pg.balance === 600000, "group figures kept");
+check(pg.stages[0].bank === "GTBank" && pg.stages[0].narration === "Blocks" && pg.stages[0].amount === 400000, "stage and its source details kept");
+// a desktop from before payments were shared must still sync, and bad data must cost only itself
+check(P.validateProjectsSnapshot(snap).projects[0].payments.length === 0, "a snapshot with no payments field is still valid");
+const junk = P.validateProjectsSnapshot(P.makeProjectsSnapshot({ origin: DT, company: { key: "co-12345678-aaaa", name: "PI" },
+  projects: [{ ...payProject, payments: "garbage" }, { id: "p8", displayNumber: "PRJ/26/008", clientName: "B", payments: [null, { payee: 123, stages: "nope" }] }], now: new Date("2026-10-05T10:00:00Z") }));
+check(junk.ok && junk.projects.length === 2, "malformed payments never cost the phone its project list");
+check(junk.projects[0].payments.length === 0 && junk.projects[1].payments[0].stages.length === 0, "junk payments sanitised away");
+console.log("Confirmed: payments travel read-only with the project list, old and bad payloads tolerated");
+
 section("Connection test files");
 const probe = P.makeProbe({ origin: PH, note: "download test", now: new Date("2026-10-05T10:00:00Z") });
 check(P.validateProbe(probe).ok, "a probe validates");

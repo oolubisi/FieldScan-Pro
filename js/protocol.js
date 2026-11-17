@@ -201,6 +201,37 @@
     };
   }
 
+  /**
+   * Payments ride along with the project list: desktop -> phone, read-only.
+   * Optional, so a desktop from before payments were shared simply sends none,
+   * and an older phone ignores them. Anything malformed is dropped rather than
+   * failing the snapshot -- one bad payment row must never cost the phone its
+   * whole project list.
+   */
+  function validateSnapshotPayments(list) {
+    if (!Array.isArray(list)) return [];
+    const str = (v) => (typeof v === "string" ? v : "");
+    const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
+    return list.filter((g) => g && typeof g === "object").map((g) => ({
+      payee: str(g.payee),
+      direction: str(g.direction),
+      category: str(g.category),
+      totalInvoice: num(g.totalInvoice),
+      paid: num(g.paid),
+      balance: num(g.balance),
+      stages: (Array.isArray(g.stages) ? g.stages : []).filter((s) => s && typeof s === "object").map((s) => ({
+        stage: str(s.stage),
+        date: str(s.date),
+        amount: num(s.amount),
+        method: str(s.method),
+        status: str(s.status),
+        bank: str(s.bank),
+        sender: str(s.sender),
+        narration: str(s.narration),
+      })),
+    }));
+  }
+
   function validateProjectsSnapshot(obj) {
     const errors = [];
     if (!obj || typeof obj !== "object") return { ok: false, errors: ["not an object"], projects: [], acks: [], invalidAcks: 0 };
@@ -223,6 +254,7 @@
           clientName: p.clientName,
           siteLocation: typeof p.siteLocation === "string" ? p.siteLocation : "",
           status: typeof p.status === "string" ? p.status : "",
+          payments: validateSnapshotPayments(p.payments),
         });
       } else invalid.push({ index });
     });

@@ -9,7 +9,7 @@
 const PJ_PROGRESS = "progress";
 const PJ_SNAG = "snag";
 const PJ_STAGES = ["Before", "During", "After"];
-const PJ_TABS = [["progress", "Progress"], ["snags", "Snags"], ["photos", "Photos"], ["tasks", "Tasks"], ["inspections", "Inspections"], ["takeoff", "Take-off"], ["diary", "Diary"]];
+const PJ_TABS = [["progress", "Progress"], ["snags", "Snags"], ["photos", "Photos"], ["payments", "Payments"], ["tasks", "Tasks"], ["inspections", "Inspections"], ["takeoff", "Take-off"], ["diary", "Diary"]];
 const PJ_PHOTO_PARENTS = ["progress", "snag", "task", "inspection", "diary", "takeoff"];
 
 const pjToday = () => new Date().toISOString().slice(0, 10);
@@ -76,6 +76,7 @@ async function renderProjectDetail(key, tab, sub) {
   if (tab === "progress") return pjProgressTab(body, p, base, mine);
   if (tab === "snags") return pjSnagsTab(body, p, base, mine);
   if (tab === "photos") return pjPhotosTab(body, p, mine);
+  if (tab === "payments") return pjPaymentsTab(body, p);
   const linked = { tasks: ["task", (r) => r.data.title || "Untitled", (r) => r.data.status || "Open", (r) => "#/tasks/" + r.id, "tasks"],
     inspections: ["inspection", (r) => r.data.title || "Untitled", (r) => r.data.inspectionDate || "", (r) => "#/inspections/" + r.id, "inspections"],
     takeoff: ["takeoff", (r) => r.data.name || r.data.title || r.data.description || "Take-off", (r) => "", (r) => "#/takeoff/" + r.data.groupId + "/" + r.id, "take-off cards"],
@@ -84,6 +85,62 @@ async function renderProjectDetail(key, tab, sub) {
   const rows = (await fsp.sync.getRecords(linked[0])).filter(mine);
   body.innerHTML = rows.length ? `<div class="card feed">${rows.map((r) => `<a class="row link-row" href="${escapeHtml(linked[3](r))}" style="color:inherit;text-decoration:none;"><div class="grow"><strong>${escapeHtml(linked[1](r))}</strong><div class="muted">${escapeHtml(linked[2](r))}</div></div></a>`).join("")}</div>`
     : `<div class="card"><p class="muted">No ${linked[4]} for this project yet.</p></div>`;
+}
+
+// ---------- Payments (read-only) ----------
+// Payments are entered and edited on the desktop only. They arrive here as part of
+// the project list the desktop publishes, so this tab just displays them: there is
+// deliberately nothing here that writes, and no record type the phone can send back.
+
+const pjMoney = (v) => "₦" + moneyValue(v);
+
+/** Money in from the client reads as a receipt; everything else is money out. */
+const pjIncoming = (g) => g.direction === "Client Receipt";
+
+function pjPayStatus(g) {
+  if (g.direction === "Small Expense") return ["Logged", "info"];
+  if (g.balance <= 0) return ["Complete", "ok"];
+  if (g.paid <= 0) return ["Awaiting approval", "wait"];
+  return ["Part paid", "info"];
+}
+
+function pjPaymentsTab(body, p) {
+  const groups = Array.isArray(p.payments) ? p.payments : [];
+  if (!groups.length) {
+    body.innerHTML = `<div class="card"><p class="muted">No payments on this project yet. Payments are entered on the desktop and appear here after a sync.</p></div>`;
+    return;
+  }
+  const sum = (test) => groups.filter(test).reduce((t, g) => t + (Number(g.paid) || 0), 0);
+  const inflow = sum(pjIncoming), outflow = sum((g) => !pjIncoming(g));
+  const owed = groups.filter((g) => !pjIncoming(g) && g.direction !== "Small Expense").reduce((t, g) => t + Math.max(0, Number(g.balance) || 0), 0);
+
+  body.innerHTML = `<div class="card">
+      <div class="row"><div class="grow">Received from client</div><b>${pjMoney(inflow)}</b></div>
+      <div class="row"><div class="grow">Paid out</div><b>${pjMoney(outflow)}</b></div>
+      <div class="row"><div class="grow">Still owed on invoices</div><b>${pjMoney(owed)}</b></div>
+    </div>
+    ${groups.map((g) => {
+      const [label, kind] = pjPayStatus(g);
+      const sign = pjIncoming(g) ? "+" : "-";
+      const head = [g.direction, g.category].filter(Boolean).join(" · ");
+      return `<div class="card">
+        <div class="row"><div class="grow"><strong>${escapeHtml(g.payee || "Unnamed")}</strong>
+          <div class="muted">${escapeHtml(head)}</div></div><span class="badge ${kind}">${escapeHtml(label)}</span></div>
+        <div class="row"><div class="grow muted">Invoice</div><b>${pjMoney(g.totalInvoice)}</b></div>
+        <div class="row"><div class="grow muted">Paid to date</div><b>${pjMoney(g.paid)}</b></div>
+        ${g.direction === "Small Expense" ? "" : `<div class="row"><div class="grow muted">Balance</div><b>${pjMoney(g.balance)}</b></div>`}
+        ${(g.stages || []).map((s) => {
+          const pending = s.status === "pending_approval";
+          const source = [s.bank, s.sender, s.narration].filter(Boolean).join(" · ");
+          return `<div class="row"><div class="grow">
+              <strong>${pending ? "Awaiting approval" : escapeHtml(s.stage ? "Stage " + s.stage : "Full payment")}</strong>
+              <div class="muted">${escapeHtml([s.date, s.method].filter(Boolean).join(" · "))}</div>
+              ${source ? `<div class="muted">${escapeHtml(source)}</div>` : ""}
+            </div><b>${pending ? "" : sign + pjMoney(s.amount)}</b></div>`;
+        }).join("")}
+      </div>`;
+    }).join("")}
+    <p class="muted">Payments are entered on the desktop. This is a read-only copy from the last sync.</p>`;
 }
 
 // ---------- Progress ----------
