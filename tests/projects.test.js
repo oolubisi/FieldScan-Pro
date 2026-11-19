@@ -71,7 +71,8 @@ async function bootApp({ withIndexedDB = true, hash = "" } = {}) {
 
 
 const snap = () => P.makeProjectsSnapshot({ origin: DT, company: { key: CO, name: "PI Projects" },
-  projects: [{ id: "p1", displayNumber: "PRJ/26/001", clientName: "Acme", siteLocation: "Lekki", status: "Active" }], now: T0 });
+  projects: [{ id: "p1", displayNumber: "PRJ/26/001", clientName: "Acme", siteLocation: "Lekki", status: "Active" },
+    { id: "p2", displayNumber: "PRJ/26/002", clientName: "Old Client", siteLocation: "Ikeja", status: "Handed Over" }], now: T0 });
 const go = async (a, hash, h2) => { a.w.location.hash = hash; await a.waitFor(() => a.text("#main h2") === h2, "screen " + h2); };
 const KEY = encodeURIComponent(CO + ":p1");
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -85,6 +86,20 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
   section("List and tab bar");
   check(a.$('#tabbar a[data-route="projects"]') && a.$('#tabbar a[data-route="projects"]').classList.contains("active"), "Projects tab present and active");
   check(/PRJ\/26\/001/.test(a.text("#main")) && /0 progress logs · 0 snags/.test(a.text("#main")), "project listed with counts");
+
+  section("Handed Over projects: collapsed by default, viewable on request");
+  check(!/PRJ\/26\/002/.test(a.text("#main")), "handed-over project is not shown while collapsed");
+  check(/Handed Over \(1\)/.test(a.text("#main")), "a collapsed header names the count");
+  const handedHead = () => [...a.$$("#main .card")].find((c) => /Handed Over/.test(c.textContent));
+  handedHead().click();
+  await a.waitFor(() => /PRJ\/26\/002/.test(a.text("#main")), "expands to reveal the handed-over project");
+  check(/Old Client/.test(a.text("#main")), "its details (client name) are shown once expanded");
+  handedHead().click();
+  await a.waitFor(() => !/PRJ\/26\/002/.test(a.text("#main")), "collapses again on a second click");
+  const handedDetail = encodeURIComponent(CO + ":p2");
+  await go(a, "#/projects/" + handedDetail, "PRJ/26/002 — Old Client");
+  check(a.$$(".pj-tabs a").length === 8, "a handed-over project's own detail page still opens normally");
+  await go(a, "#/projects", "Projects");
 
   section("Progress");
   await go(a, "#/projects/" + KEY, "PRJ/26/001 — Acme");

@@ -14,6 +14,9 @@ const PJ_PHOTO_PARENTS = ["progress", "snag", "task", "inspection", "diary", "ta
 
 const pjToday = () => new Date().toISOString().slice(0, 10);
 const pjClamp = (v) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+let pjHandedOpen = false; // collapsed by default, same as the desktop's project list
+
+function pjToggleHanded() { pjHandedOpen = !pjHandedOpen; renderProjectList(); }
 
 /** Sets (or clears) one photo's stage on its parent record. */
 async function pjSetStage(parentId, photoId, stage) {
@@ -42,6 +45,14 @@ async function renderProjectsScreen() {
   return m ? renderProjectDetail(decodeURIComponent(m[1]), m[2] || "progress", m[3]) : renderProjectList();
 }
 
+function pjCardHtml(p, counts) {
+  const c = counts[p.key] || { progress: 0, snag: 0 };
+  return `<a class="card link-card" href="#/projects/${encodeURIComponent(p.key)}" style="display:block;color:inherit;text-decoration:none;">
+    <h3>${escapeHtml(p.displayNumber + " — " + (p.clientName || ""))}</h3>
+    <p class="muted" style="margin:0;">${escapeHtml(p.companyName || "")}${p.siteLocation ? " · " + escapeHtml(p.siteLocation) : ""}</p>
+    <p class="muted" style="margin:4px 0 0;">${c.progress} progress log${c.progress === 1 ? "" : "s"} · ${c.snag} snag${c.snag === 1 ? "" : "s"}</p></a>`;
+}
+
 async function renderProjectList() {
   const main = document.getElementById("main");
   const m = await pjLoad();
@@ -49,15 +60,16 @@ async function renderProjectList() {
   for (const type of ["progress", "snag"]) for (const r of coFilter(await fsp.sync.getRecords(type))) {
     const k = `${r.companyKey}:${r.projectId}`; counts[k] = counts[k] || { progress: 0, snag: 0 }; counts[k][type]++;
   }
+  const active = pjLive(m.projects);
+  const handed = m.projects.filter((p) => p.handedOver);
+  const handedHead = handed.length ? `<div class="card link-card" style="cursor:pointer;" onclick="pjToggleHanded()">
+    <h3 style="display:flex;align-items:center;gap:8px;margin:0;"><span style="transition:transform 0.15s;flex:none;">${pjHandedOpen ? "▾" : "▸"}</span> Handed Over (${handed.length})</h3>
+  </div>` : "";
   main.innerHTML = `<h2>Projects</h2>${toBanner(m)}
     <div class="toolbar"><a class="btn secondary" href="#/prospects">Prospects</a><a class="btn" href="#/prospects/new">＋ New prospect</a></div>
-    ${pjLive(m.projects).length ? pjLive(m.projects).map((p) => {
-      const c = counts[p.key] || { progress: 0, snag: 0 };
-      return `<a class="card link-card" href="#/projects/${encodeURIComponent(p.key)}" style="display:block;color:inherit;text-decoration:none;">
-        <h3>${escapeHtml(p.displayNumber + " — " + (p.clientName || ""))}</h3>
-        <p class="muted" style="margin:0;">${escapeHtml(p.companyName || "")}${p.siteLocation ? " · " + escapeHtml(p.siteLocation) : ""}</p>
-        <p class="muted" style="margin:4px 0 0;">${c.progress} progress log${c.progress === 1 ? "" : "s"} · ${c.snag} snag${c.snag === 1 ? "" : "s"}</p></a>`;
-    }).join("") : `<div class="card"><h3>No projects yet</h3><p class="muted">Projects arrive from the desktop app through Sync.</p></div>`}`;
+    ${active.length ? active.map((p) => pjCardHtml(p, counts)).join("") : `<div class="card"><h3>No projects yet</h3><p class="muted">Projects arrive from the desktop app through Sync.</p></div>`}
+    ${handedHead}
+    ${handed.length && pjHandedOpen ? handed.map((p) => pjCardHtml(p, counts)).join("") : ""}`;
 }
 
 async function renderProjectDetail(key, tab, sub) {
